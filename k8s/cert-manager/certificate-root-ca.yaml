@@ -1,0 +1,22 @@
+# ═══════════════════════════════════════════════════════════════════
+# Certificado raiz CA propio (firmado por selfsigned-bootstrap)
+# Este es el que se importa en el browser para tener candado verde
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: root-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: micrositio-root-ca
+  duration: 87600h  # 10 anos
+  renewBefore: 720h  # renovar 30 dias antes de expirar
+  secretName: root-ca
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  issuerRef:
+    name: selfsigned-bootstrap
+    kind: ClusterIssuer
+    group: cert-manager.io

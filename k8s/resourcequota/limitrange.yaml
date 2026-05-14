@@ -1,0 +1,23 @@
+# ═══════════════════════════════════════════════════════════════════
+# LimitRange — defaults para containers sin requests/limits explicitos
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: micrositio-limits
+  namespace: micrositio
+spec:
+  limits:
+    - type: Container
+      default:        # limits si no se definen
+        cpu: 500m
+        memory: 512Mi
+      defaultRequest: # requests si no se definen
+        cpu: 100m
+        memory: 128Mi
+      max:
+        cpu: "2"
+        memory: 2Gi
+      min:
+        cpu: 10m
+        memory: 32Mi

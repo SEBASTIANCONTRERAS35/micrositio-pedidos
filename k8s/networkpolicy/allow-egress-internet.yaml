@@ -1,0 +1,28 @@
+# ═══════════════════════════════════════════════════════════════════
+# Permite a api y worker salir a internet (carriers, Resend, Twilio)
+# Bloquea acceso a IPs internas RFC1918
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-worker-egress-internet
+  namespace: micrositio
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: app, operator: In, values: [api, worker] }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8       # RFC1918 - red privada
+              - 172.16.0.0/12    # RFC1918 - red privada
+              - 192.168.0.0/16   # RFC1918 - red privada (incluye pod CIDR)
+              - 169.254.0.0/16   # link-local (instance metadata)
+      ports:
+        - protocol: TCP
+          port: 443  # HTTPS hacia carriers/Resend/Twilio
+        - protocol: TCP
+          port: 80   # HTTP (raro pero a veces requerido)

@@ -1,0 +1,256 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Checkout & Cart
+   ═══════════════════════════════════════════════════════════════════ */
+
+[x-cloak] { display: none !important; }
+
+/* Cart button in header */
+.ct-cart-btn {
+  position: relative;
+  background: #0F172A;
+  color: #fff;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+}
+.ct-cart-btn__count {
+  background: #EF4444;
+  color: #fff;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 20px;
+  text-align: center;
+}
+.ct-header__right { display: flex; gap: 8px; align-items: center; }
+
+/* Add to cart button on cards */
+.ct-card__add-btn {
+  background: #0F172A;
+  color: #fff;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: inherit;
+}
+.ct-card__add-btn:disabled {
+  background: #94A3B8;
+  cursor: not-allowed;
+}
+
+/* Cart drawer overlay */
+.ct-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+}
+
+/* Cart drawer */
+.ct-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 100%;
+  max-width: 400px;
+  height: 100vh;
+  background: #fff;
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.1);
+}
+.ct-drawer__header {
+  padding: 20px;
+  border-bottom: 1px solid #E2E8F0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ct-drawer__header h3 { margin: 0; }
+.ct-drawer__close {
+  background: none;
+  border: none;
+  font-size: 32px;
+  cursor: pointer;
+  line-height: 1;
+}
+.ct-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+.ct-drawer__empty { text-align: center; color: #64748B; padding: 40px 0; }
+.ct-drawer__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #F1F5F9;
+}
+.ct-drawer__item-name { font-weight: 600; margin: 0; }
+.ct-drawer__item-price { color: #64748B; margin: 4px 0 0; font-size: 14px; }
+.ct-drawer__item-qty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ct-drawer__item-qty button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #CBD5E1;
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.ct-drawer__item-qty button:disabled { opacity: 0.4; cursor: not-allowed; }
+.ct-drawer__footer {
+  padding: 20px;
+  border-top: 1px solid #E2E8F0;
+}
+.ct-drawer__total {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 700;
+}
+.ct-drawer__checkout-btn {
+  display: block;
+  background: #0F172A;
+  color: #fff;
+  text-align: center;
+  padding: 14px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+/* Checkout page */
+.checkout-main { padding: 24px; max-width: 720px; margin: 0 auto; }
+.checkout-summary, .checkout-form {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 16px;
+  border: 1px solid #E2E8F0;
+}
+.checkout-summary h2, .checkout-form h2 { margin: 0 0 16px; }
+.checkout-empty { color: #64748B; }
+.checkout-items { list-style: none; padding: 0; margin: 0 0 16px; }
+.checkout-item {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #F1F5F9;
+}
+.checkout-item__qty { font-weight: 700; color: #64748B; }
+.checkout-totals { padding-top: 12px; border-top: 1px solid #E2E8F0; }
+.checkout-totals__row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+.checkout-totals__row--total {
+  font-size: 18px;
+  font-weight: 700;
+  border-top: 1px solid #E2E8F0;
+  padding-top: 12px;
+  margin-top: 8px;
+}
+
+.form-group { margin-bottom: 16px; }
+.form-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+.form-group input, .form-group textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+.form-group textarea { resize: vertical; min-height: 80px; }
+.radio-label { display: flex; align-items: center; gap: 8px; font-weight: normal; }
+.radio-label input { width: auto; }
+.checkout-submit-btn {
+  width: 100%;
+  background: #0F172A;
+  color: #fff;
+  border: none;
+  padding: 14px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.checkout-submit-btn:disabled { background: #94A3B8; cursor: not-allowed; }
+.checkout-error {
+  margin-top: 12px;
+  padding: 10px;
+  background: #FEE2E2;
+  color: #B91C1C;
+  border-radius: 6px;
+}
+
+/* Confirmation */
+.confirmacion-main { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.confirmacion-card { background: #fff; border-radius: 16px; padding: 40px; max-width: 480px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+.confirmacion-icon { font-size: 56px; text-align: center; margin-bottom: 12px; }
+.confirmacion-card h1 { margin: 0 0 8px; text-align: center; }
+.confirmacion-id { text-align: center; color: #64748B; margin: 0 0 16px; }
+.confirmacion-msg { color: #475569; line-height: 1.5; }
+.confirmacion-detalles, .confirmacion-direccion {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #E2E8F0;
+}
+.confirmacion-detalles h3, .confirmacion-direccion h3 { margin: 0 0 12px; font-size: 16px; }
+.confirmacion-detalles ul { list-style: none; padding: 0; margin: 0 0 12px; }
+.confirmacion-detalles li {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+.confirmacion-total {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 18px;
+  padding-top: 12px;
+  border-top: 1px solid #E2E8F0;
+}
+.confirmacion-back {
+  display: block;
+  text-align: center;
+  margin-top: 24px;
+  color: #0F172A;
+  text-decoration: none;
+  font-weight: 600;
+}
+.ct-header__back {
+  text-decoration: none;
+  color: #0F172A;
+  font-weight: 600;
+  margin-right: 16px;
+}

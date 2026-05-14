@@ -1,0 +1,150 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Panel del dueno
+   ═══════════════════════════════════════════════════════════════════ */
+
+* { box-sizing: border-box; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: #F1F5F9;
+  margin: 0;
+  color: #0F172A;
+}
+
+.panel-header {
+  background: #fff;
+  padding: 16px 24px;
+  border-bottom: 1px solid #E2E8F0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.panel-header h1 { margin: 0; font-size: 20px; }
+.panel-header__user { display: flex; align-items: center; gap: 12px; color: #64748B; font-size: 14px; }
+.panel-header__logout {
+  background: none;
+  border: 1px solid #CBD5E1;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.panel-main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+
+.panel-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.panel-stat {
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
+}
+.panel-stat__label { color: #64748B; font-size: 13px; margin: 0 0 8px; }
+.panel-stat__value { font-size: 28px; font-weight: 700; margin: 0; }
+.panel-stat__value--orange { color: #EA580C; }
+.panel-stat__value--blue { color: #2563EB; }
+.panel-stat__value--green { color: #16A34A; }
+
+.panel-pedidos {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
+  overflow: hidden;
+}
+.panel-pedidos__header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #E2E8F0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.panel-pedidos__header h2 { margin: 0; font-size: 18px; }
+
+.panel-tabs { display: flex; gap: 4px; border-bottom: 1px solid #E2E8F0; padding: 0 20px; }
+.panel-tab {
+  background: none;
+  border: none;
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  color: #64748B;
+  font-family: inherit;
+  font-weight: 500;
+}
+.panel-tab--active { color: #0F172A; border-bottom-color: #0F172A; }
+
+.panel-pedido-list { list-style: none; padding: 0; margin: 0; }
+.panel-pedido {
+  padding: 16px 20px;
+  border-bottom: 1px solid #F1F5F9;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 16px;
+  align-items: center;
+}
+.panel-pedido:hover { background: #F8FAFC; cursor: pointer; }
+.panel-pedido__id { font-weight: 700; color: #0F172A; }
+.panel-pedido__info { color: #475569; font-size: 14px; }
+.panel-pedido__total { font-weight: 700; }
+.panel-pedido__estado {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.panel-pedido__estado--pendiente { background: #FEF3C7; color: #B45309; }
+.panel-pedido__estado--confirmado { background: #DBEAFE; color: #1D4ED8; }
+.panel-pedido__estado--en_camino { background: #E0E7FF; color: #4338CA; }
+.panel-pedido__estado--entregado { background: #D1FAE5; color: #065F46; }
+.panel-pedido__estado--cancelado { background: #FEE2E2; color: #B91C1C; }
+
+/* Login */
+.login-main { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.login-card {
+  background: #fff;
+  padding: 40px;
+  border-radius: 16px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+.login-card h1 { margin: 0 0 8px; text-align: center; }
+.login-card__subtitle { color: #64748B; text-align: center; margin: 0 0 24px; }
+
+/* Pedido detalle modal */
+.pedido-detalle {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+.pedido-detalle__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.btn-confirmar {
+  background: #16A34A;
+  color: #fff;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: inherit;
+}
+.btn-cancelar {
+  background: #fff;
+  color: #B91C1C;
+  border: 1px solid #FCA5A5;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: inherit;
+}

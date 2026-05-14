@@ -1,0 +1,26 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: lint-test
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: workdir
+      default: api
+  workspaces:
+    - name: source
+  steps:
+    - name: lint
+      image: node:20-alpine
+      workingDir: $(workspaces.source.path)/$(params.workdir)
+      script: |
+        #!/bin/sh
+        set -e
+        npm run lint || (echo "Lint failed"; exit 1)
+    - name: test
+      image: node:20-alpine
+      workingDir: $(workspaces.source.path)/$(params.workdir)
+      script: |
+        #!/bin/sh
+        set -e
+        npm test

@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: micrositio
+  labels:
+    app: worker
+    component: backend
+spec:
+  replicas: 1  # KEDA escala desde 1 hasta 5 segun cola Redis
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+        component: backend
+    spec:
+      serviceAccountName: worker-sa
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60  # mas tiempo para terminar jobs en curso
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: SEBASTIANCONTRERAS35/micrositio-worker:latest
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: api-env  # mismo secret que el API (comparten Redis y Mongo)
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: LOG_LEVEL
+              value: info
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+          # No livenessProbe HTTP porque worker no expone HTTP
+          # En su lugar usamos exec probe que verifica conexion Redis
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "ps aux | grep -v grep | grep -q 'node index.js' || exit 1"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

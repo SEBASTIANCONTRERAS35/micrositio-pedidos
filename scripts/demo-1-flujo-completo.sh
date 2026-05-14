@@ -1,0 +1,50 @@
+#!/bin/bash
+# Demo 1: Flujo completo end-to-end (4 min)
+# Asume: cluster funcionando + seed data aplicado
+set -e
+
+echo "════════════════════════════════════════════════════"
+echo "DEMO 1: Flujo completo de un pedido (4 min)"
+echo "════════════════════════════════════════════════════"
+echo ""
+echo "1. Abrir browser: https://zuyu.local/tienda/demo"
+echo "   - Mostrar el catalogo de Farmacia Demo"
+echo "   - Agregar 2 productos al carrito"
+echo "   - Click en el icono del carrito"
+echo "   - Click 'Proceder al checkout'"
+echo ""
+echo "2. En el checkout:"
+echo "   - Llenar formulario con datos de prueba"
+echo "   - Confirmar pedido"
+echo "   - Mostrar pagina de confirmacion con el pedidoId"
+echo ""
+read -p "[Pulsa ENTER cuando hayas creado el pedido en el browser]"
+
+echo ""
+echo "3. Cambiar al panel del dueno: https://zuyu.local/panel/login"
+echo "   - Login: demo@zuyu.local / Demo1234!"
+echo "   - Mostrar el pedido recien creado en estado PENDIENTE"
+echo "   - Click en el pedido para ver detalles"
+echo ""
+read -p "[Pulsa ENTER cuando hayas visto el pedido]"
+
+echo ""
+echo "4. Confirmar el pedido (simula al dueno aceptando):"
+echo "   - Click 'Confirmar pedido'"
+echo "   - El estado cambia a CONFIRMADO"
+echo ""
+read -p "[Pulsa ENTER cuando hayas confirmado]"
+
+echo ""
+echo "5. Ver logs del worker (en otra terminal):"
+echo "   kubectl logs -n micrositio -l app=worker --tail=20"
+echo ""
+echo "   Buscar lineas:"
+echo "   - 'Solicitando repartidor'"
+echo "   - 'Repartidor solicitado' (con deliveryId mock)"
+echo "   - 'Email enviado' o 'Notificacion enviada'"
+echo ""
+
+echo "════════════════════════════════════════════════════"
+echo "DEMO 1 COMPLETADA"
+echo "════════════════════════════════════════════════════"

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Panel del negocio</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/panel.css">
+  <script defer src="/js/alpine.min.js"></script>
+</head>
+<body x-data="loginForm">
+  <main class="login-main">
+    <div class="login-card">
+      <h1>Panel del negocio</h1>
+      <p class="login-card__subtitle">Ingresa para gestionar tus pedidos</p>
+
+      <form @submit.prevent="submit">
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" x-model="email" required>
+        </div>
+        <div class="form-group">
+          <label for="password">Contrasena</label>
+          <input type="password" id="password" x-model="password" required>
+        </div>
+
+        <button type="submit" class="checkout-submit-btn" :disabled="submitting">
+          <span x-show="!submitting">Entrar</span>
+          <span x-show="submitting">Entrando...</span>
+        </button>
+
+        <p x-show="error" class="checkout-error" x-text="error" style="margin-top:12px;"></p>
+      </form>
+    </div>
+  </main>
+
+  <style>
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
+    .form-group input { width: 100%; padding: 10px 12px; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+    .checkout-submit-btn { width: 100%; background: #0F172A; color: #fff; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    .checkout-error { padding: 10px; background: #FEE2E2; color: #B91C1C; border-radius: 6px; }
+  </style>
+
+  <script>
+    function loginForm() {
+      return {
+        email: '',
+        password: '',
+        submitting: false,
+        error: '',
+        async submit() {
+          this.submitting = true;
+          this.error = '';
+          try {
+            const res = await fetch('/api/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: this.email, password: this.password })
+            });
+            if (!res.ok) {
+              const err = await res.json();
+              throw new Error(err.message || 'Credenciales invalidas');
+            }
+            const { accessToken } = await res.json();
+            localStorage.setItem('panel_token', accessToken);
+            window.location.href = '/panel/pedidos';
+          } catch (e) {
+            this.error = e.message;
+            this.submitting = false;
+          }
+        }
+      };
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+# ═══════════════════════════════════════════════════════════════════
+# AnalysisTemplate (BONUS +3 pts)
+# Aborta el canary si error rate 5xx > 5% en 1 minuto
+# Requiere Prometheus instalado (Fase 6)
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: api-error-rate
+  namespace: micrositio
+spec:
+  args:
+    - name: service-name
+  metrics:
+    - name: error-rate-5xx
+      interval: 30s
+      count: 4    # 4 mediciones (2 min)
+      successCondition: result[0] < 0.05  # < 5% error rate
+      failureCondition: result[0] >= 0.05
+      provider:
+        prometheus:
+          address: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+          query: |
+            sum(rate(http_requests_total{namespace="micrositio", app="{{args.service-name}}", status=~"5.."}[1m]))
+            /
+            sum(rate(http_requests_total{namespace="micrositio", app="{{args.service-name}}"}[1m]))

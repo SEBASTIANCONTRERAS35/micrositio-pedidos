@@ -1,0 +1,22 @@
+# ═══════════════════════════════════════════════════════════════════
+# Headless Service para MongoDB Replica Set
+# clusterIP: None es OBLIGATORIO para que cada pod tenga su DNS estable
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-headless
+  namespace: micrositio
+  labels:
+    app: mongodb
+    component: database
+spec:
+  clusterIP: None  # Headless service
+  selector:
+    app: mongodb
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: 27017
+      protocol: TCP
+  publishNotReadyAddresses: true  # Para que el RS pueda formarse

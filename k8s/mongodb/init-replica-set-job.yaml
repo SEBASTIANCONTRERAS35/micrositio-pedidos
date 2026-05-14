@@ -1,0 +1,117 @@
+# ═══════════════════════════════════════════════════════════════════
+# Job de inicialización del Replica Set + creación de usuarios
+# Se ejecuta UNA SOLA VEZ después de que MongoDB está corriendo
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mongodb-init
+  namespace: micrositio
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 5
+  template:
+    spec:
+      serviceAccountName: mongodb-sa
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: init
+          image: mongo:7.0
+          env:
+            - name: MONGO_ROOT_USER
+              valueFrom:
+                secretKeyRef: { name: mongodb-users, key: MONGO_INITDB_ROOT_USERNAME }
+            - name: MONGO_ROOT_PASS
+              valueFrom:
+                secretKeyRef: { name: mongodb-users, key: MONGO_INITDB_ROOT_PASSWORD }
+            - name: APP_USER
+              valueFrom:
+                secretKeyRef: { name: mongodb-users, key: APP_USER }
+            - name: APP_PASS
+              valueFrom:
+                secretKeyRef: { name: mongodb-users, key: APP_PASSWORD }
+            - name: WORKER_USER
+              valueFrom:
+                secretKeyRef: { name: mongodb-users, key: WORKER_USER }
+            - name: WORKER_PASS
+              valueFrom:
+                secretKeyRef: { name: mongodb-users, key: WORKER_PASSWORD }
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+
+              echo "Esperando a que mongodb-0 este listo..."
+              until mongosh --host mongodb-0.mongodb-headless --eval "db.adminCommand('ping')" --quiet > /dev/null 2>&1; do
+                sleep 3
+              done
+
+              echo "Inicializando Replica Set..."
+              mongosh --host mongodb-0.mongodb-headless --quiet <<EOF
+              try {
+                rs.status();
+                print('Replica Set ya inicializado');
+              } catch(e) {
+                rs.initiate({
+                  _id: 'rs0',
+                  members: [
+                    { _id: 0, host: 'mongodb-0.mongodb-headless.micrositio.svc:27017', priority: 2 },
+                    { _id: 1, host: 'mongodb-1.mongodb-headless.micrositio.svc:27017', priority: 1 },
+                    { _id: 2, host: 'mongodb-2.mongodb-headless.micrositio.svc:27017', priority: 1 }
+                  ]
+                });
+                print('Replica Set inicializado');
+              }
+              EOF
+
+              echo "Esperando primary..."
+              until mongosh --host mongodb-0.mongodb-headless --eval "rs.isMaster().ismaster" --quiet | grep -q true; do
+                sleep 3
+              done
+
+              echo "Creando usuarios..."
+              mongosh --host mongodb-0.mongodb-headless --quiet \
+                -u "$MONGO_ROOT_USER" -p "$MONGO_ROOT_PASS" --authenticationDatabase admin <<EOF
+              use admin;
+              try { db.createUser({ user: '$MONGO_ROOT_USER', pwd: '$MONGO_ROOT_PASS', roles: ['root'] }); } catch(e) { print('root user exists'); }
+
+              use micrositio;
+              try {
+                db.createUser({
+                  user: '$APP_USER',
+                  pwd: '$APP_PASS',
+                  roles: [{ role: 'readWrite', db: 'micrositio' }]
+                });
+                print('Usuario app creado');
+              } catch(e) { print('Usuario app ya existe'); }
+
+              try {
+                db.createUser({
+                  user: '$WORKER_USER',
+                  pwd: '$WORKER_PASS',
+                  roles: [
+                    { role: 'readWrite', db: 'micrositio' },
+                    { role: 'read', db: 'micrositio' }
+                  ]
+                });
+                print('Usuario worker creado');
+              } catch(e) { print('Usuario worker ya existe'); }
+              EOF
+
+              echo "Init completado"
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 200m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: [ALL]

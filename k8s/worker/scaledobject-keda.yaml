@@ -1,0 +1,54 @@
+# ═══════════════════════════════════════════════════════════════════
+# KEDA ScaledObject para escalar el worker por longitud de cola Redis
+# Pre-requisito: KEDA 2.19+ instalado en el cluster
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-redis-auth
+  namespace: micrositio
+spec:
+  secretTargetRef:
+    - parameter: password
+      name: redis-auth
+      key: REDIS_PASSWORD
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: worker-scaler
+  namespace: micrositio
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: worker
+  pollingInterval: 10  # check cada 10s
+  cooldownPeriod: 60   # esperar 60s antes de scale-down
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  triggers:
+    # Cola de notificaciones
+    - type: redis
+      metadata:
+        address: redis.micrositio.svc.cluster.local:6379
+        listName: bull:notificaciones:wait
+        listLength: "5"   # >5 jobs pendientes -> escalar
+      authenticationRef:
+        name: keda-redis-auth
+    # Cola de delivery
+    - type: redis
+      metadata:
+        address: redis.micrositio.svc.cluster.local:6379
+        listName: bull:delivery:wait
+        listLength: "3"
+      authenticationRef:
+        name: keda-redis-auth
+    # Cola de webhooks
+    - type: redis
+      metadata:
+        address: redis.micrositio.svc.cluster.local:6379
+        listName: bull:webhook-delivery:wait
+        listLength: "10"
+      authenticationRef:
+        name: keda-redis-auth
