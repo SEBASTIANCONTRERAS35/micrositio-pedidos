@@ -12,7 +12,8 @@
     "format": "prettier --write \"**/*.{js,json,md,ejs,yaml,yml}\"",
     "format:check": "prettier --check \"**/*.{js,json,md,ejs,yaml,yml}\"",
     "test": "npm run test --workspaces",
-    "audit:security": "npm audit --audit-level=high"
+    "audit:security": "npm audit --audit-level=high",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.6.0",

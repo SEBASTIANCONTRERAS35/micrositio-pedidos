@@ -42,6 +42,6 @@ const negocioSchema = new mongoose.Schema(
   { timestamps: { createdAt: 'creadoEn', updatedAt: 'actualizadoEn' } }
 );
 
-negocioSchema.index({ slug: 1 });
+// Index ya creado por unique: true en el campo slug, no duplicar
 
 module.exports = mongoose.model('Negocio', negocioSchema);
