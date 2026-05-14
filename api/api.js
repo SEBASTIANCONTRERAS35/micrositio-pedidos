@@ -21,7 +21,7 @@ const path = require('path');
 const compression = require('compression');
 const cors = require('cors');
 const hpp = require('hpp');
-const mongoSanitize = require('express-mongo-sanitize');
+const mongoSanitize = require('./middlewares/mongoSanitize');
 const pinoHttp = require('pino-http');
 const mongoose = require('mongoose');
 
@@ -58,14 +58,18 @@ app.use(pinoHttp({ logger }));
 
 // ── Body parsers (excluir webhooks que necesitan raw) ──
 app.use((req, res, next) => {
-  if (req.path.startsWith('/webhooks/')) return next();
+  if (req.path.startsWith('/webhooks/')) {
+    return next();
+  }
   express.json({ limit: '20kb' })(req, res, next);
 });
 app.use((req, res, next) => {
-  if (req.path.startsWith('/webhooks/')) return next();
+  if (req.path.startsWith('/webhooks/')) {
+    return next();
+  }
   express.urlencoded({ extended: false, limit: '20kb' })(req, res, next);
 });
-app.use(mongoSanitize());
+app.use(mongoSanitize);
 app.use(hpp());
 
 // ── Static assets ──
@@ -94,7 +98,9 @@ app.use(errorHandler);
 async function start() {
   try {
     const mongoUri = process.env.MONGODB_URI;
-    if (!mongoUri) throw new Error('MONGODB_URI no definido');
+    if (!mongoUri) {
+      throw new Error('MONGODB_URI no definido');
+    }
 
     await mongoose.connect(mongoUri, {
       serverSelectionTimeoutMS: 10000,

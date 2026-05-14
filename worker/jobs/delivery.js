@@ -17,11 +17,11 @@ const colaNotificaciones = new Queue('notificaciones', {
   },
 });
 
-// Carriers (mock o real)
+// Carriers (mock o real) — copia local en worker/services/delivery/
 const carriers = {
-  ivoy: require('../../api/services/delivery/providers/ivoy'),
-  lalamove: require('../../api/services/delivery/providers/lalamove'),
-  uberDirect: require('../../api/services/delivery/providers/uberDirect'),
+  ivoy: require('../services/delivery/providers/ivoy'),
+  lalamove: require('../services/delivery/providers/lalamove'),
+  uberDirect: require('../services/delivery/providers/uberDirect'),
 };
 
 module.exports = async (job, logger) => {
@@ -29,7 +29,9 @@ module.exports = async (job, logger) => {
     const { pedidoId, proveedor } = job.data;
 
     const pedido = await Pedido.findOne({ pedidoId });
-    if (!pedido) throw new Error(`Pedido ${pedidoId} no encontrado`);
+    if (!pedido) {
+      throw new Error(`Pedido ${pedidoId} no encontrado`);
+    }
 
     const carrier = carriers[proveedor] || carriers.ivoy;
     const result = await carrier.requestDelivery(pedido);
