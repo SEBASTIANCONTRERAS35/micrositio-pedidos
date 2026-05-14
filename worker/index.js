@@ -15,6 +15,7 @@ const pino = require('pino');
 const deliveryJob = require('./jobs/delivery');
 const notificacionesJob = require('./jobs/notificaciones');
 const webhookJob = require('./jobs/webhookDelivery');
+const syncZuyuJob = require('./jobs/syncZuyu');
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
@@ -38,7 +39,7 @@ const connection = {
   password: process.env.REDIS_PASSWORD,
 };
 
-let workers = [];
+const workers = [];
 
 async function start() {
   // Conectar a MongoDB
@@ -84,6 +85,22 @@ async function start() {
       async (job) => {
         logger.info({ jobName: job.name, jobId: job.id }, 'Procesando webhook job');
         return webhookJob(job, logger);
+      },
+      {
+        connection,
+        concurrency: 10,
+        autorun: true,
+      }
+    )
+  );
+
+  // Worker de sync con ZUYU (eventos de inventario)
+  workers.push(
+    new Worker(
+      'sync-zuyu',
+      async (job) => {
+        logger.info({ jobName: job.name, jobId: job.id }, 'Procesando sync ZUYU');
+        return syncZuyuJob(job, logger);
       },
       {
         connection,
