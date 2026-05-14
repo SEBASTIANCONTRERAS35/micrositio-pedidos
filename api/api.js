@@ -73,8 +73,11 @@ app.use(mongoSanitize);
 app.use(hpp());
 
 // ── Static assets ──
-app.use('/css', express.static(path.join(__dirname, 'public/css'), { maxAge: '1d' }));
-app.use('/js', express.static(path.join(__dirname, 'public/js'), { maxAge: '1d' }));
+// En dev: sin cache (para que cambios en CSS/JS se vean al instante)
+// En prod: cache de 1 dia (los assets cambian de path con hash o versionado del Tekton build)
+const staticMaxAge = process.env.NODE_ENV === 'production' ? '1d' : 0;
+app.use('/css', express.static(path.join(__dirname, 'public/css'), { maxAge: staticMaxAge }));
+app.use('/js', express.static(path.join(__dirname, 'public/js'), { maxAge: staticMaxAge }));
 
 // ── Routes ──
 app.use('/health', healthRoutes);

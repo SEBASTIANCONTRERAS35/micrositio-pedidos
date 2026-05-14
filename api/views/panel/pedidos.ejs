@@ -1,180 +1,300 @@
 <!DOCTYPE html>
 <html lang="es-MX">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pedidos — <%= negocio.nombre %></title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/css/panel.css">
-  <script defer src="/js/alpine.min.js"></script>
-</head>
-<body x-data="panelPedidos" x-init="loadPedidos(); setInterval(loadPedidos, 30000)">
-
-  <header class="panel-header">
-    <h1><%= negocio.nombre %> — Pedidos</h1>
-    <div class="panel-header__user">
-      <span><%= usuario.email %></span>
-      <button class="panel-header__logout" @click="logout">Salir</button>
-    </div>
-  </header>
-
-  <main class="panel-main">
-
-    <!-- Stats -->
-    <div class="panel-stats">
-      <div class="panel-stat">
-        <p class="panel-stat__label">Pendientes</p>
-        <p class="panel-stat__value panel-stat__value--orange" x-text="stats.pendientes"></p>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pedidos — <%= negocio.nombre %></title>
+    <link rel="stylesheet" href="/css/panel.css" />
+    <script defer src="/js/alpine.min.js"></script>
+  </head>
+  <body x-data="panelPedidos" x-init="loadPedidos(); setInterval(loadPedidos, 30000)">
+    <header class="panel-header">
+      <div class="panel-header__brand">
+        <div
+          class="panel-header__logo"
+          x-text="negocio.nombre ? negocio.nombre.charAt(0) : 'M'"
+        ></div>
+        <h1 x-text="negocio.nombre || 'Panel'"></h1>
       </div>
-      <div class="panel-stat">
-        <p class="panel-stat__label">En camino</p>
-        <p class="panel-stat__value panel-stat__value--blue" x-text="stats.enCamino"></p>
+      <div class="panel-header__user">
+        <span class="panel-header__user-email" x-text="usuario.email"></span>
+        <button class="panel-header__logout" @click="logout">Cerrar sesion</button>
       </div>
-      <div class="panel-stat">
-        <p class="panel-stat__label">Entregados hoy</p>
-        <p class="panel-stat__value panel-stat__value--green" x-text="stats.entregadosHoy"></p>
-      </div>
-      <div class="panel-stat">
-        <p class="panel-stat__label">Total hoy</p>
-        <p class="panel-stat__value" x-text="'$' + stats.totalHoy.toFixed(2)"></p>
-      </div>
-    </div>
+    </header>
 
-    <!-- Pedidos -->
-    <section class="panel-pedidos">
-      <div class="panel-pedidos__header">
-        <h2>Pedidos</h2>
-        <button @click="loadPedidos" class="panel-header__logout">Refrescar</button>
-      </div>
-
-      <div class="panel-tabs">
-        <template x-for="tab in tabs" :key="tab.value">
-          <button
-            class="panel-tab"
-            :class="filter === tab.value ? 'panel-tab--active' : ''"
-            @click="filter = tab.value">
-            <span x-text="tab.label"></span>
-          </button>
-        </template>
-      </div>
-
-      <ul class="panel-pedido-list">
-        <template x-for="pedido in filtered" :key="pedido._id">
-          <li class="panel-pedido" @click="openDetalle(pedido)">
-            <span class="panel-pedido__id" x-text="pedido.pedidoId"></span>
-            <span class="panel-pedido__info">
-              <strong x-text="pedido.cliente.nombre"></strong> &middot;
-              <span x-text="pedido.productos.length + ' producto(s)'"></span> &middot;
-              <span x-text="formatTime(pedido.creadoEn)"></span>
-            </span>
-            <span class="panel-pedido__total" x-text="'$' + pedido.total.toFixed(2)"></span>
-            <span class="panel-pedido__estado" :class="'panel-pedido__estado--' + pedido.estado" x-text="pedido.estado"></span>
-          </li>
-        </template>
-      </ul>
-
-      <p x-show="filtered.length === 0" style="text-align:center; padding:32px; color:#64748B;">
-        No hay pedidos en este estado.
+    <main class="panel-main">
+      <h1 class="panel-page-title">Pedidos</h1>
+      <p class="panel-page-subtitle">
+        Confirma, cancela y rastrea los pedidos online de tu negocio.
       </p>
-    </section>
-  </main>
 
-  <!-- Modal de detalle (simple) -->
-  <div x-show="selected" x-cloak @click="selected = null" style="position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:50; padding:24px; overflow-y:auto;">
-    <div @click.stop class="pedido-detalle" x-show="selected">
-      <template x-if="selected">
-        <div>
-          <h2 x-text="'Pedido ' + selected.pedidoId"></h2>
-          <p>Cliente: <strong x-text="selected.cliente.nombre"></strong></p>
-          <p>Telefono: <a :href="'tel:' + selected.cliente.telefono" x-text="selected.cliente.telefono"></a></p>
-          <p>Direccion: <span x-text="selected.cliente.direccion"></span></p>
-          <p x-show="selected.notas">Notas: <span x-text="selected.notas"></span></p>
-
-          <h3>Productos</h3>
-          <ul>
-            <template x-for="prod in selected.productos">
-              <li>
-                <span x-text="prod.cantidad + 'x ' + prod.nombre"></span>
-                <span> = $<span x-text="(prod.precioUnitario * prod.cantidad).toFixed(2)"></span></span>
-              </li>
-            </template>
-          </ul>
-
-          <p style="font-size:18px; font-weight:700;">Total: $<span x-text="selected.total.toFixed(2)"></span></p>
-
-          <p>Estado actual: <strong x-text="selected.estado"></strong></p>
-
-          <template x-if="selected.delivery && selected.delivery.trackingUrl">
-            <p>Tracking: <a :href="selected.delivery.trackingUrl" target="_blank">Ver en vivo</a></p>
-          </template>
-
-          <div class="pedido-detalle__actions">
-            <button x-show="selected.estado === 'pendiente'" @click="confirmar(selected._id)" class="btn-confirmar">Confirmar pedido</button>
-            <button x-show="['pendiente', 'confirmado'].includes(selected.estado)" @click="cancelar(selected._id)" class="btn-cancelar">Cancelar</button>
-            <button @click="selected = null" style="margin-left:auto;">Cerrar</button>
-          </div>
+      <!-- Stats -->
+      <div class="panel-stats">
+        <div class="panel-stat">
+          <p class="panel-stat__label">Pendientes</p>
+          <p class="panel-stat__value panel-stat__value--orange" x-text="stats.pendientes"></p>
+          <p class="panel-stat__delta">Necesitan tu confirmacion</p>
         </div>
-      </template>
-    </div>
-  </div>
+        <div class="panel-stat">
+          <p class="panel-stat__label">En camino</p>
+          <p class="panel-stat__value panel-stat__value--blue" x-text="stats.enCamino"></p>
+          <p class="panel-stat__delta">Repartidor asignado</p>
+        </div>
+        <div class="panel-stat">
+          <p class="panel-stat__label">Entregados hoy</p>
+          <p class="panel-stat__value panel-stat__value--green" x-text="stats.entregadosHoy"></p>
+          <p class="panel-stat__delta">Pedidos completados</p>
+        </div>
+        <div class="panel-stat">
+          <p class="panel-stat__label">Total hoy</p>
+          <p class="panel-stat__value" x-text="'$' + stats.totalHoy.toFixed(2)"></p>
+          <p class="panel-stat__delta">Ingresos del dia</p>
+        </div>
+      </div>
 
-  <script>
-    function panelPedidos() {
-      return {
-        pedidos: [],
-        selected: null,
-        filter: 'todos',
-        tabs: [
-          { value: 'todos', label: 'Todos' },
-          { value: 'pendiente', label: 'Pendientes' },
-          { value: 'confirmado', label: 'Confirmados' },
-          { value: 'en_camino', label: 'En camino' },
-          { value: 'entregado', label: 'Entregados' }
-        ],
-        get filtered() {
-          if (this.filter === 'todos') return this.pedidos;
-          return this.pedidos.filter(p => p.estado === this.filter);
-        },
-        get stats() {
-          const today = new Date().toDateString();
-          return {
-            pendientes: this.pedidos.filter(p => p.estado === 'pendiente').length,
-            enCamino: this.pedidos.filter(p => p.estado === 'en_camino').length,
-            entregadosHoy: this.pedidos.filter(p => p.estado === 'entregado' && new Date(p.creadoEn).toDateString() === today).length,
-            totalHoy: this.pedidos.filter(p => new Date(p.creadoEn).toDateString() === today).reduce((s, p) => s + p.total, 0)
-          };
-        },
-        formatTime(iso) {
-          const d = new Date(iso);
-          return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
-        },
-        async loadPedidos() {
-          const token = localStorage.getItem('panel_token');
-          if (!token) { window.location.href = '/panel/login'; return; }
-          const res = await fetch('/api/panel/pedidos', { headers: { Authorization: 'Bearer ' + token } });
-          if (res.status === 401) { localStorage.removeItem('panel_token'); window.location.href = '/panel/login'; return; }
-          this.pedidos = await res.json();
-        },
-        openDetalle(pedido) { this.selected = pedido; },
-        async confirmar(id) {
-          const token = localStorage.getItem('panel_token');
-          await fetch('/api/pedidos/' + id + '/confirmar', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
-          await this.loadPedidos();
-          this.selected = null;
-        },
-        async cancelar(id) {
-          if (!confirm('Cancelar este pedido?')) return;
-          const token = localStorage.getItem('panel_token');
-          await fetch('/api/pedidos/' + id + '/cancelar', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
-          await this.loadPedidos();
-          this.selected = null;
-        },
-        logout() {
-          localStorage.removeItem('panel_token');
-          window.location.href = '/panel/login';
-        }
-      };
-    }
-  </script>
-</body>
+      <!-- Lista de pedidos -->
+      <section class="panel-pedidos">
+        <div class="panel-pedidos__header">
+          <h2>Pedidos recientes</h2>
+          <button @click="loadPedidos" class="panel-header__logout">↻ Refrescar</button>
+        </div>
+
+        <div class="panel-tabs">
+          <template x-for="tab in tabs" :key="tab.value">
+            <button
+              class="panel-tab"
+              :class="filter === tab.value ? 'panel-tab--active' : ''"
+              @click="filter = tab.value"
+            >
+              <span x-text="tab.label"></span>
+              <span class="panel-tab__count" x-text="countByStatus(tab.value)"></span>
+            </button>
+          </template>
+        </div>
+
+        <ul class="panel-pedido-list" x-show="filtered.length > 0">
+          <template x-for="pedido in filtered" :key="pedido._id">
+            <li class="panel-pedido" @click="openDetalle(pedido)">
+              <span class="panel-pedido__id" x-text="pedido.pedidoId"></span>
+              <span class="panel-pedido__info">
+                <span class="panel-pedido__cliente" x-text="pedido.cliente.nombre"></span>
+                <span class="panel-pedido__meta">
+                  <span
+                    x-text="pedido.productos.length + ' producto' + (pedido.productos.length > 1 ? 's' : '')"
+                  ></span>
+                  · <span x-text="formatTime(pedido.creadoEn)"></span>
+                </span>
+              </span>
+              <span class="panel-pedido__total" x-text="'$' + pedido.total.toFixed(2)"></span>
+              <span
+                class="panel-pedido__estado"
+                :class="'panel-pedido__estado--' + pedido.estado"
+                x-text="estadoLabel(pedido.estado)"
+              ></span>
+            </li>
+          </template>
+        </ul>
+
+        <div x-show="filtered.length === 0" class="panel-empty">
+          <div class="panel-empty__icon">📦</div>
+          <p>No hay pedidos en este estado.</p>
+        </div>
+      </section>
+    </main>
+
+    <!-- Modal de detalle -->
+    <div x-show="selected" x-cloak class="modal-overlay" @click="selected = null">
+      <div @click.stop class="pedido-detalle">
+        <template x-if="selected">
+          <div>
+            <div class="pedido-detalle__header">
+              <div>
+                <h2 x-text="'Pedido ' + selected.pedidoId"></h2>
+                <span
+                  class="panel-pedido__estado"
+                  :class="'panel-pedido__estado--' + selected.estado"
+                  x-text="estadoLabel(selected.estado)"
+                  style="margin-top: 8px"
+                ></span>
+              </div>
+              <button class="pedido-detalle__close" @click="selected = null">×</button>
+            </div>
+
+            <div class="pedido-detalle__section">
+              <h3>Cliente</h3>
+              <p><strong x-text="selected.cliente.nombre"></strong></p>
+              <p>
+                📞
+                <a
+                  :href="'tel:' + selected.cliente.telefono"
+                  x-text="selected.cliente.telefono"
+                ></a>
+              </p>
+              <p>📧 <span x-text="selected.cliente.email"></span></p>
+            </div>
+
+            <div class="pedido-detalle__section">
+              <h3>Direccion de entrega</h3>
+              <p x-text="selected.cliente.direccion"></p>
+            </div>
+
+            <div class="pedido-detalle__section" x-show="selected.notas">
+              <h3>Notas del cliente</h3>
+              <p x-text="selected.notas"></p>
+            </div>
+
+            <div class="pedido-detalle__section">
+              <h3>Productos</h3>
+              <ul class="pedido-detalle__items">
+                <template x-for="prod in selected.productos">
+                  <li>
+                    <span x-text="prod.cantidad + 'x ' + prod.nombre"></span>
+                    <span x-text="'$' + (prod.precioUnitario * prod.cantidad).toFixed(2)"></span>
+                  </li>
+                </template>
+              </ul>
+              <p class="pedido-detalle__total" x-text="'Total: $' + selected.total.toFixed(2)"></p>
+            </div>
+
+            <template x-if="selected.delivery && selected.delivery.trackingUrl">
+              <div class="pedido-detalle__section">
+                <h3>Tracking del repartidor</h3>
+                <p><a :href="selected.delivery.trackingUrl" target="_blank">Ver en vivo →</a></p>
+              </div>
+            </template>
+
+            <div class="pedido-detalle__actions">
+              <button
+                x-show="selected.estado === 'pendiente'"
+                @click="confirmar(selected._id)"
+                class="btn-confirmar"
+              >
+                ✓ Confirmar pedido
+              </button>
+              <button
+                x-show="['pendiente', 'confirmado'].includes(selected.estado)"
+                @click="cancelar(selected._id)"
+                class="btn-cancelar"
+              >
+                Cancelar
+              </button>
+              <button @click="selected = null" class="btn-cerrar">Cerrar</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <script>
+      function panelPedidos() {
+        return {
+          pedidos: [],
+          usuario: { email: '' },
+          negocio: { nombre: '' },
+          selected: null,
+          filter: 'todos',
+          tabs: [
+            { value: 'todos', label: 'Todos' },
+            { value: 'pendiente', label: 'Pendientes' },
+            { value: 'confirmado', label: 'Confirmados' },
+            { value: 'en_camino', label: 'En camino' },
+            { value: 'entregado', label: 'Entregados' },
+          ],
+          get filtered() {
+            if (this.filter === 'todos') return this.pedidos;
+            return this.pedidos.filter((p) => p.estado === this.filter);
+          },
+          get stats() {
+            const today = new Date().toDateString();
+            return {
+              pendientes: this.pedidos.filter((p) => p.estado === 'pendiente').length,
+              enCamino: this.pedidos.filter((p) => p.estado === 'en_camino').length,
+              entregadosHoy: this.pedidos.filter(
+                (p) => p.estado === 'entregado' && new Date(p.creadoEn).toDateString() === today
+              ).length,
+              totalHoy: this.pedidos
+                .filter((p) => new Date(p.creadoEn).toDateString() === today)
+                .reduce((s, p) => s + p.total, 0),
+            };
+          },
+          countByStatus(status) {
+            if (status === 'todos') return this.pedidos.length;
+            return this.pedidos.filter((p) => p.estado === status).length;
+          },
+          estadoLabel(estado) {
+            const map = {
+              pendiente: 'Pendiente',
+              confirmado: 'Confirmado',
+              en_camino: 'En camino',
+              entregado: 'Entregado',
+              cancelado: 'Cancelado',
+            };
+            return map[estado] || estado;
+          },
+          formatTime(iso) {
+            const d = new Date(iso);
+            const today = new Date().toDateString();
+            if (d.toDateString() === today)
+              return 'Hoy ' + d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+            return d.toLocaleDateString('es-MX', {
+              day: '2-digit',
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+          },
+          async loadPedidos() {
+            const token = localStorage.getItem('panel_token');
+            if (!token) {
+              window.location.href = '/panel/login';
+              return;
+            }
+            try {
+              const [pedidosRes, meRes] = await Promise.all([
+                fetch('/api/panel/pedidos', { headers: { Authorization: 'Bearer ' + token } }),
+                fetch('/api/panel/me', { headers: { Authorization: 'Bearer ' + token } }),
+              ]);
+              if (pedidosRes.status === 401 || meRes.status === 401) {
+                localStorage.removeItem('panel_token');
+                window.location.href = '/panel/login';
+                return;
+              }
+              this.pedidos = await pedidosRes.json();
+              const me = await meRes.json();
+              this.usuario = me.usuario;
+              this.negocio = me.negocio;
+            } catch (e) {
+              console.error(e);
+            }
+          },
+          openDetalle(pedido) {
+            this.selected = pedido;
+          },
+          async confirmar(id) {
+            const token = localStorage.getItem('panel_token');
+            await fetch('/api/pedidos/' + id + '/confirmar', {
+              method: 'POST',
+              headers: { Authorization: 'Bearer ' + token },
+            });
+            await this.loadPedidos();
+            this.selected = null;
+          },
+          async cancelar(id) {
+            if (!confirm('Cancelar este pedido? El stock se devolvera.')) return;
+            const token = localStorage.getItem('panel_token');
+            await fetch('/api/pedidos/' + id + '/cancelar', {
+              method: 'POST',
+              headers: { Authorization: 'Bearer ' + token },
+            });
+            await this.loadPedidos();
+            this.selected = null;
+          },
+          logout() {
+            localStorage.removeItem('panel_token');
+            window.location.href = '/panel/login';
+          },
+        };
+      }
+    </script>
+  </body>
 </html>

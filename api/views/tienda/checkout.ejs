@@ -1,181 +1,260 @@
 <!DOCTYPE html>
-<html lang="es-MX">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Checkout — <%= negocio.nombre %></title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-  <link rel="stylesheet" href="/css/tienda.css">
-  <link rel="stylesheet" href="/css/checkout.css">
-  <script defer src="/js/alpine.min.js"></script>
-</head>
-<body class="ct-page" x-data="checkoutForm('<%= negocio.slug %>')" x-init="loadCart()">
-
-  <header class="ct-header">
-    <div class="ct-header__inner">
-      <a href="/tienda/<%= negocio.slug %>" class="ct-header__back">&larr; Volver al catalogo</a>
-      <h1 class="ct-header__name">Checkout</h1>
-    </div>
-  </header>
-
-  <main class="checkout-main">
-    <div class="checkout-main__inner">
-
-      <!-- Resumen del carrito -->
-      <section class="checkout-summary">
-        <h2>Tu pedido</h2>
-        <template x-if="items.length === 0">
-          <p class="checkout-empty">Tu carrito esta vacio. <a href="/tienda/<%= negocio.slug %>">Volver al catalogo</a></p>
-        </template>
-        <ul class="checkout-items">
-          <template x-for="item in items" :key="item.id">
-            <li class="checkout-item">
-              <span class="checkout-item__qty" x-text="item.cantidad + 'x'"></span>
-              <span class="checkout-item__name" x-text="item.nombre"></span>
-              <span class="checkout-item__price" x-text="'$' + (item.precio * item.cantidad).toFixed(2)"></span>
-            </li>
-          </template>
-        </ul>
-        <div class="checkout-totals" x-show="items.length > 0">
-          <div class="checkout-totals__row">
-            <span>Subtotal</span>
-            <span x-text="'$' + subtotal.toFixed(2)"></span>
-          </div>
-          <div class="checkout-totals__row">
-            <span>Envio (estimado)</span>
-            <span x-text="'$' + costoEnvio.toFixed(2)"></span>
-          </div>
-          <div class="checkout-totals__row checkout-totals__row--total">
-            <span>Total</span>
-            <span x-text="'$' + total.toFixed(2)"></span>
-          </div>
+<html lang="es-MX" data-type="<%= negocio.tipo %>">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Checkout — <%= negocio.nombre %></title>
+    <link rel="stylesheet" href="/css/tienda.css" />
+    <link rel="stylesheet" href="/css/checkout.css" />
+    <script defer src="/js/alpine.min.js"></script>
+  </head>
+  <body
+    data-type="<%= negocio.tipo %>"
+    x-data="checkoutForm('<%= negocio.slug %>')"
+    x-init="loadCart()"
+  >
+    <header class="ct-header">
+      <div class="ct-header__inner">
+        <a href="/tienda/<%= negocio.slug %>" class="ct-header__back">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+          Volver
+        </a>
+        <div class="ct-header__titles" style="text-align: center">
+          <h1 class="ct-header__name">Checkout</h1>
+          <span class="ct-header__badge" style="margin: 0 auto"><%= negocio.nombre %></span>
         </div>
-      </section>
+        <div style="width: 80px"></div>
+      </div>
+    </header>
 
-      <!-- Formulario de datos del cliente -->
-      <section class="checkout-form" x-show="items.length > 0">
-        <h2>Tus datos</h2>
-        <form @submit.prevent="submit">
-          <div class="form-group">
-            <label for="nombre">Nombre completo *</label>
-            <input
-              type="text" id="nombre" name="nombre"
-              x-model="form.nombre" required minlength="2" maxlength="100">
+    <main class="checkout-main">
+      <div class="checkout-main__inner">
+        <h2 class="checkout-title">Confirma tu pedido</h2>
+        <p class="checkout-subtitle" style="margin-top: -12px">
+          Revisa los productos y completa tus datos para que te llegue a domicilio.
+        </p>
+
+        <!-- Resumen del carrito -->
+        <section class="checkout-card">
+          <h3 class="checkout-card__title">Tu pedido</h3>
+          <template x-if="items.length === 0">
+            <p class="checkout-empty">
+              Tu carrito esta vacio. <a href="/tienda/<%= negocio.slug %>">Volver al catalogo →</a>
+            </p>
+          </template>
+          <ul class="checkout-items" x-show="items.length > 0">
+            <template x-for="item in items" :key="item.id">
+              <li class="checkout-item">
+                <span class="checkout-item__qty" x-text="item.cantidad + 'x'"></span>
+                <span class="checkout-item__name" x-text="item.nombre"></span>
+                <span
+                  class="checkout-item__price"
+                  x-text="'$' + (item.precio * item.cantidad).toFixed(2)"
+                ></span>
+              </li>
+            </template>
+          </ul>
+          <div class="checkout-totals" x-show="items.length > 0">
+            <div class="checkout-totals__row">
+              <span>Subtotal</span>
+              <span x-text="'$' + subtotal.toFixed(2)"></span>
+            </div>
+            <div class="checkout-totals__row">
+              <span>Envio (estimado)</span>
+              <span x-text="'$' + costoEnvio.toFixed(2)"></span>
+            </div>
+            <div class="checkout-totals__row checkout-totals__row--total">
+              <span>Total</span>
+              <span x-text="'$' + total.toFixed(2)"></span>
+            </div>
           </div>
+        </section>
 
-          <div class="form-group">
-            <label for="telefono">Telefono (10 digitos) *</label>
-            <input
-              type="tel" id="telefono" name="telefono"
-              x-model="form.telefono" required pattern="[0-9]{10}"
-              placeholder="5512345678">
-          </div>
+        <!-- Formulario de datos del cliente -->
+        <section class="checkout-card" x-show="items.length > 0" x-cloak>
+          <h3 class="checkout-card__title">Tus datos</h3>
+          <form @submit.prevent="submit">
+            <div class="form-group">
+              <label for="nombre">Nombre completo</label>
+              <input
+                type="text"
+                id="nombre"
+                name="nombre"
+                x-model="form.nombre"
+                required
+                minlength="2"
+                maxlength="100"
+                placeholder="Como te llamas?"
+              />
+            </div>
 
-          <div class="form-group">
-            <label for="email">Email *</label>
-            <input
-              type="email" id="email" name="email"
-              x-model="form.email" required>
-          </div>
+            <div class="form-group">
+              <label for="telefono">Telefono</label>
+              <input
+                type="tel"
+                id="telefono"
+                name="telefono"
+                x-model="form.telefono"
+                required
+                pattern="[0-9]{10}"
+                placeholder="5512345678"
+              />
+              <p class="form-group__hint">10 digitos sin espacios. Te avisaremos por WhatsApp.</p>
+            </div>
 
-          <div class="form-group">
-            <label for="direccion">Direccion de entrega *</label>
-            <textarea
-              id="direccion" name="direccion"
-              x-model="form.direccion" required minlength="10" maxlength="300"
-              placeholder="Calle, numero, colonia, codigo postal, ciudad. Referencias adicionales."></textarea>
-          </div>
+            <div class="form-group">
+              <label for="email">Email</label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                x-model="form.email"
+                required
+                placeholder="tu@correo.com"
+              />
+            </div>
 
-          <div class="form-group">
-            <label for="notas">Notas para el negocio (opcional)</label>
-            <textarea
-              id="notas" name="notas"
-              x-model="form.notas" maxlength="500"
-              placeholder="Instrucciones especiales, alergias, etc."></textarea>
-          </div>
+            <div class="form-group">
+              <label for="direccion">Direccion de entrega</label>
+              <textarea
+                id="direccion"
+                name="direccion"
+                x-model="form.direccion"
+                required
+                minlength="10"
+                maxlength="300"
+                placeholder="Calle, numero, colonia, codigo postal, ciudad. Referencias adicionales."
+              ></textarea>
+            </div>
 
-          <div class="form-group">
-            <label>Metodo de pago</label>
-            <label class="radio-label">
-              <input type="radio" x-model="form.metodoPago" value="efectivo" checked>
-              Efectivo contra entrega
-            </label>
-          </div>
+            <div class="form-group">
+              <label for="notas">Notas para el negocio (opcional)</label>
+              <textarea
+                id="notas"
+                name="notas"
+                x-model="form.notas"
+                maxlength="500"
+                placeholder="Instrucciones especiales, alergias, etc."
+              ></textarea>
+            </div>
 
-          <button type="submit" class="checkout-submit-btn" :disabled="submitting">
-            <span x-show="!submitting">Confirmar pedido</span>
-            <span x-show="submitting">Enviando...</span>
-          </button>
+            <div class="form-group">
+              <label>Metodo de pago</label>
+              <div class="radio-group">
+                <label class="radio-label">
+                  <input type="radio" x-model="form.metodoPago" value="efectivo" checked />
+                  Efectivo contra entrega
+                </label>
+                <label class="radio-label">
+                  <input type="radio" x-model="form.metodoPago" value="tarjeta_entrega" />
+                  Tarjeta al recibir
+                </label>
+              </div>
+            </div>
 
-          <p x-show="error" class="checkout-error" x-text="error"></p>
-        </form>
-      </section>
+            <button type="submit" class="checkout-submit-btn" :disabled="submitting">
+              <template x-if="!submitting">
+                <span style="display: inline-flex; align-items: center; gap: 8px">
+                  Confirmar pedido
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </span>
+              </template>
+              <template x-if="submitting">
+                <span>Enviando...</span>
+              </template>
+            </button>
 
-    </div>
-  </main>
+            <p x-show="error" x-cloak class="checkout-error" x-text="error"></p>
+          </form>
+        </section>
+      </div>
+    </main>
 
-  <script>
-    function checkoutForm(slug) {
-      const STORAGE_KEY = 'cart_' + slug;
-      return {
-        items: [],
-        form: {
-          nombre: '',
-          telefono: '',
-          email: '',
-          direccion: '',
-          notas: '',
-          metodoPago: 'efectivo'
-        },
-        submitting: false,
-        error: '',
-        get subtotal() { return this.items.reduce((sum, i) => sum + (i.precio * i.cantidad), 0); },
-        get costoEnvio() { return this.items.length > 0 ? 49 : 0; },
-        get total() { return this.subtotal + this.costoEnvio; },
-        loadCart() {
-          this.items = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        },
-        async submit() {
-          this.submitting = true;
-          this.error = '';
-          try {
-            const idempotencyKey = crypto.randomUUID();
-            const res = await fetch('/api/pedidos', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Idempotency-Key': idempotencyKey
-              },
-              body: JSON.stringify({
-                negocioSlug: slug,
-                cliente: {
-                  nombre: this.form.nombre,
-                  telefono: '+52' + this.form.telefono,
-                  email: this.form.email,
-                  direccion: this.form.direccion
-                },
-                productos: this.items.map(i => ({ id: i.id, cantidad: i.cantidad })),
-                metodoPago: this.form.metodoPago,
-                notas: this.form.notas || undefined
-              })
-            });
-            if (!res.ok) {
-              const err = await res.json();
-              throw new Error(err.message || 'Error al crear pedido');
+    <script>
+      function checkoutForm(slug) {
+        const STORAGE_KEY = 'cart_' + slug;
+        return {
+          items: [],
+          form: {
+            nombre: '',
+            telefono: '',
+            email: '',
+            direccion: '',
+            notas: '',
+            metodoPago: 'efectivo',
+          },
+          submitting: false,
+          error: '',
+          get subtotal() {
+            return this.items.reduce((s, i) => s + i.precio * i.cantidad, 0);
+          },
+          get costoEnvio() {
+            return this.items.length > 0 ? 49 : 0;
+          },
+          get total() {
+            return this.subtotal + this.costoEnvio;
+          },
+          loadCart() {
+            this.items = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+          },
+          async submit() {
+            this.submitting = true;
+            this.error = '';
+            try {
+              const idempotencyKey = crypto.randomUUID();
+              const res = await fetch('/api/pedidos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
+                body: JSON.stringify({
+                  negocioSlug: slug,
+                  cliente: {
+                    nombre: this.form.nombre,
+                    telefono: '+52' + this.form.telefono,
+                    email: this.form.email,
+                    direccion: this.form.direccion,
+                  },
+                  productos: this.items.map((i) => ({ id: i.id, cantidad: i.cantidad })),
+                  metodoPago: this.form.metodoPago,
+                  notas: this.form.notas || undefined,
+                }),
+              });
+              if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.message || 'Error al crear pedido');
+              }
+              const pedido = await res.json();
+              localStorage.removeItem(STORAGE_KEY);
+              window.location.href = '/tienda/' + slug + '/pedido/' + pedido.pedidoId;
+            } catch (e) {
+              this.error = e.message;
+              this.submitting = false;
             }
-            const pedido = await res.json();
-            localStorage.removeItem(STORAGE_KEY);
-            window.location.href = '/tienda/' + slug + '/pedido/' + pedido.pedidoId;
-          } catch (e) {
-            this.error = e.message;
-            this.submitting = false;
-          }
-        }
-      };
-    }
-  </script>
-
-</body>
+          },
+        };
+      }
+    </script>
+  </body>
 </html>
