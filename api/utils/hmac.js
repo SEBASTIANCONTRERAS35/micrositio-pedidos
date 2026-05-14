@@ -12,7 +12,9 @@ const crypto = require('crypto');
  * @returns {boolean}
  */
 function verifyHmacSignature(body, signature, secret) {
-  if (!signature || !secret) return false;
+  if (!signature || !secret) {
+    return false;
+  }
 
   const cleanSignature = signature.replace(/^sha256=/, '');
 
@@ -21,13 +23,12 @@ function verifyHmacSignature(body, signature, secret) {
     .update(typeof body === 'string' ? body : body.toString('utf8'))
     .digest('hex');
 
-  if (computed.length !== cleanSignature.length) return false;
+  if (computed.length !== cleanSignature.length) {
+    return false;
+  }
 
   try {
-    return crypto.timingSafeEqual(
-      Buffer.from(computed, 'hex'),
-      Buffer.from(cleanSignature, 'hex')
-    );
+    return crypto.timingSafeEqual(Buffer.from(computed, 'hex'), Buffer.from(cleanSignature, 'hex'));
   } catch {
     return false;
   }
@@ -41,7 +42,9 @@ function verifyHmacSignature(body, signature, secret) {
  */
 function isTimestampValid(timestamp, toleranceSeconds = 300) {
   const ts = parseInt(timestamp, 10);
-  if (isNaN(ts)) return false;
+  if (isNaN(ts)) {
+    return false;
+  }
 
   const now = Math.floor(Date.now() / 1000);
   return Math.abs(now - ts) <= toleranceSeconds;
@@ -57,8 +60,63 @@ function signHmac(body, secret) {
     .digest('hex');
 }
 
+/**
+ * Verifica una firma estilo Stripe / ZUYU.
+ * Header esperado:  X-Zuyu-Signature: t=<unix>,v1=<hmac>[,v0=<hmac_previo>]
+ * Se firma  `${t}.${rawBody}`  (no solo el body).
+ *
+ * @param {string} rawBody - body crudo exacto
+ * @param {string} signatureHeader - valor del header X-Zuyu-Signature
+ * @param {string[]} secrets - [secretActual, secretPrevio?]
+ * @param {number} [toleranceSeconds=300]
+ * @returns {boolean}
+ */
+function verifyZuyuSignature(rawBody, signatureHeader, secrets, toleranceSeconds = 300) {
+  if (!signatureHeader || !Array.isArray(secrets) || secrets.length === 0) {
+    return false;
+  }
+
+  const parts = Object.fromEntries(
+    signatureHeader.split(',').map((p) => {
+      const idx = p.indexOf('=');
+      return [p.slice(0, idx).trim(), p.slice(idx + 1).trim()];
+    })
+  );
+
+  const t = parseInt(parts.t, 10);
+  if (!t || Number.isNaN(t)) {
+    return false;
+  }
+
+  // Anti-replay: timestamp dentro de la ventana
+  if (!isTimestampValid(t, toleranceSeconds)) {
+    return false;
+  }
+
+  const candidateSigs = [parts.v1, parts.v0].filter(Boolean);
+  const signedPayload = `${t}.${rawBody}`;
+
+  for (const secret of secrets.filter(Boolean)) {
+    const expected = crypto.createHmac('sha256', secret).update(signedPayload).digest('hex');
+    for (const sig of candidateSigs) {
+      if (sig.length !== expected.length) {
+        continue;
+      }
+      try {
+        if (crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))) {
+          return true;
+        }
+      } catch {
+        /* longitudes invalidas — seguir probando */
+      }
+    }
+  }
+  return false;
+}
+
 module.exports = {
   verifyHmacSignature,
+  verifyZuyuSignature,
   isTimestampValid,
   signHmac,
 };
