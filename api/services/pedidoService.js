@@ -14,6 +14,8 @@ const Pedido = require('../models/pedido');
 const Negocio = require('../models/negocio');
 const { Queue } = require('bullmq');
 const redis = require('./redis');
+const zuyu = require('./zuyu');
+const { tiendaCache } = require('./cache');
 const { StockInsuficienteError, NotFoundError } = require('../utils/errors');
 const logger = require('../utils/logger');
 
@@ -48,13 +50,25 @@ async function generarPedidoId() {
 
 /**
  * Crea un pedido con stock atomico
+ *
+ * En modo MOCK (ZUYU_MOCK=true): descuenta stock localmente con transaccion MongoDB
+ * En modo PROD (ZUYU_MOCK=false): delega a ZUYU API que es la fuente de verdad,
+ *   y ademas guarda copia local del pedido para tracking + delivery
+ *
  * @param {object} input - { negocioSlug, cliente, productos, metodoPago, notas }
  * @returns {object} pedido creado
  */
 async function crearPedidoConStock(input) {
   // 1. Buscar negocio
   const negocio = await Negocio.findOne({ slug: input.negocioSlug, activo: true }).lean();
-  if (!negocio) throw new NotFoundError('Negocio no encontrado');
+  if (!negocio) {
+    throw new NotFoundError('Negocio no encontrado');
+  }
+
+  // Si NO esta en modo mock: delegar a ZUYU para que descuente stock
+  if (!zuyu.IS_MOCK) {
+    return crearPedidoViaZuyu(negocio, input);
+  }
 
   // 2. Buscar productos para snapshot
   const productosIds = input.productos.map((p) => new mongoose.Types.ObjectId(p.id));
@@ -71,7 +85,9 @@ async function crearPedidoConStock(input) {
   // 3. Construir snapshot y validar stock preliminar
   const productosSnapshot = input.productos.map((req) => {
     const db = productosDb.find((p) => p._id.toString() === req.id);
-    if (db.stock < req.cantidad) throw new StockInsuficienteError(req.id);
+    if (db.stock < req.cantidad) {
+      throw new StockInsuficienteError(req.id);
+    }
     return {
       id: db._id,
       nombre: db.nombre,
@@ -149,7 +165,9 @@ async function crearPedidoConStock(input) {
  */
 async function confirmarPedido(pedidoId, usuarioId) {
   const pedido = await Pedido.findOne({ pedidoId }).populate('negocioId');
-  if (!pedido) throw new NotFoundError('Pedido no encontrado');
+  if (!pedido) {
+    throw new NotFoundError('Pedido no encontrado');
+  }
   if (pedido.estado !== 'pendiente') {
     throw new Error('Solo se pueden confirmar pedidos pendientes');
   }
@@ -174,7 +192,9 @@ async function cancelarPedido(pedidoId, usuarioId) {
     let pedidoCancelado;
     await session.withTransaction(async () => {
       const pedido = await Pedido.findOne({ pedidoId }).session(session);
-      if (!pedido) throw new NotFoundError('Pedido no encontrado');
+      if (!pedido) {
+        throw new NotFoundError('Pedido no encontrado');
+      }
       if (['entregado', 'cancelado'].includes(pedido.estado)) {
         throw new Error(`No se puede cancelar pedido ${pedido.estado}`);
       }
@@ -201,6 +221,49 @@ async function cancelarPedido(pedidoId, usuarioId) {
   } finally {
     session.endSession();
   }
+}
+
+/**
+ * Crea pedido via ZUYU API (modo produccion)
+ * ZUYU verifica/decrementa stock atomicamente del lado de su Replica Set
+ */
+async function crearPedidoViaZuyu(negocio, input) {
+  const pedidoId = await generarPedidoId();
+
+  // 1. Pedir a ZUYU que reserve y descuente stock atomicamente
+  const zuyuResp = await zuyu.crearPedido(input.negocioSlug, {
+    referenciaExterna: pedidoId,
+    cliente: input.cliente,
+    productos: input.productos,
+    metodoPago: input.metodoPago,
+    canal: 'micrositio',
+  });
+
+  // 2. Guardar copia local para tracking + delivery + panel
+  const pedido = await Pedido.create({
+    pedidoId,
+    negocioId: negocio._id,
+    cliente: input.cliente,
+    productos: zuyuResp.productos, // snapshot autoritativo de ZUYU
+    subtotal: zuyuResp.subtotal,
+    costoEnvio: zuyuResp.costoEnvio || 49,
+    total: zuyuResp.total,
+    metodoPago: input.metodoPago || 'efectivo',
+    estado: 'pendiente',
+    notas: input.notas,
+    historial: [
+      { estado: 'pendiente', nota: `Pedido creado via ZUYU id=${zuyuResp.zuyuPedidoId}` },
+    ],
+  });
+
+  // 3. Invalidar cache del catalogo (el stock cambio)
+  tiendaCache.delete(input.negocioSlug);
+
+  // 4. Encolar notificacion
+  await colaNotificaciones.add('confirmacion-cliente', { pedidoId: pedido.pedidoId });
+
+  logger.info({ pedidoId, zuyuPedidoId: zuyuResp.zuyuPedidoId }, 'Pedido creado via ZUYU');
+  return pedido.toObject();
 }
 
 module.exports = {
