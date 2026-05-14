@@ -8,7 +8,7 @@ const { Queue } = require('bullmq');
 const delivery = require('../services/delivery');
 const { webhookLimiter } = require('../middlewares/rateLimit');
 const { WebhookSignatureError } = require('../utils/errors');
-const { verifyHmacSignature, isTimestampValid } = require('../utils/hmac');
+const { verifyHmacSignature, verifyZuyuSignature, isTimestampValid } = require('../utils/hmac');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -80,7 +80,15 @@ router.post(
 
 // ═══════════════════════════════════════════════════════════════════
 // POST /webhooks/zuyu — eventos de inventario desde ZUYU
-// HMAC verification con secret compartido + replay protection
+//
+// Contrato (ZUYU/backend/publicApi):
+//   Header  X-Zuyu-Signature: t=<unix>,v1=<hmac>[,v0=<previo>]
+//   Header  X-Zuyu-Event-Id:  <uuid>  (idempotencia)
+//   Body    { eventId, eventType, negocioSlug, data }
+//   eventTypes: producto_creado | producto_actualizado | producto_eliminado
+//               | stock_actualizado | pedido_confirmado
+//
+// Seguridad: HMAC estilo Stripe + dual-secret (rotacion) + replay protection.
 // ═══════════════════════════════════════════════════════════════════
 router.post(
   '/zuyu',
@@ -89,42 +97,48 @@ router.post(
   async (req, res, next) => {
     try {
       const secret = process.env.ZUYU_WEBHOOK_SECRET;
-      if (!secret) {
-        logger.warn('ZUYU_WEBHOOK_SECRET no configurado — webhook NO verificado');
-      }
+      const secretPrevio = process.env.ZUYU_WEBHOOK_SECRET_PREVIO || null;
 
       const rawBody = req.body.toString('utf8');
-      const signature = req.headers['x-zuyu-signature'];
-      const timestamp = req.headers['x-zuyu-timestamp'];
+      const signatureHeader = req.headers['x-zuyu-signature'];
+      const eventIdHeader = req.headers['x-zuyu-event-id'];
 
       if (secret) {
-        if (!isTimestampValid(timestamp)) {
-          throw new WebhookSignatureError('Timestamp expirado o invalido');
+        const secrets = [secret, secretPrevio].filter(Boolean);
+        if (!verifyZuyuSignature(rawBody, signatureHeader, secrets)) {
+          throw new WebhookSignatureError('Firma de webhook ZUYU invalida o expirada');
         }
-        if (!verifyHmacSignature(`${timestamp}.${rawBody}`, signature, secret)) {
-          throw new WebhookSignatureError();
-        }
+      } else {
+        logger.warn('ZUYU_WEBHOOK_SECRET no configurado — webhook NO verificado (solo dev)');
       }
 
       const payload = JSON.parse(rawBody);
-      const { event, negocioSlug, data } = payload;
+      const { eventId, eventType, negocioSlug, data } = payload;
 
-      if (!event || !negocioSlug) {
+      if (!eventType || !negocioSlug) {
         return res
           .status(400)
-          .json({ error: 'INVALID_PAYLOAD', message: 'event y negocioSlug requeridos' });
+          .json({ error: 'INVALID_PAYLOAD', message: 'eventType y negocioSlug requeridos' });
       }
 
-      logger.info({ event, negocioSlug }, 'Webhook ZUYU recibido');
+      // eventId del body o del header — jobId para idempotencia.
+      // BullMQ rechaza dos jobs con el mismo jobId => evento duplicado se
+      // procesa una sola vez.
+      const idemId = eventId || eventIdHeader || `${negocioSlug}:${eventType}:${Date.now()}`;
 
-      // Idempotencia: jobId unico por evento+producto+timestamp
-      const jobId = `${negocioSlug}:${event}:${data.productoId || 'none'}:${timestamp}`;
+      logger.info({ eventType, negocioSlug, eventId: idemId }, 'Webhook ZUYU recibido');
 
       await colaZuyu.add(
         'sync',
-        { event, negocioSlug, payload: data, receivedAt: Date.now() },
         {
-          jobId,
+          event: eventType,
+          negocioSlug,
+          payload: data,
+          eventId: idemId,
+          receivedAt: Date.now(),
+        },
+        {
+          jobId: idemId,
           removeOnComplete: 100,
           removeOnFail: 50,
           attempts: 3,
@@ -132,7 +146,7 @@ router.post(
         }
       );
 
-      res.status(200).json({ ok: true, jobId });
+      res.status(200).json({ ok: true, eventId: idemId });
     } catch (e) {
       next(e);
     }
