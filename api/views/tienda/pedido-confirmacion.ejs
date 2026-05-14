@@ -1,50 +1,62 @@
 <!DOCTYPE html>
-<html lang="es-MX">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pedido confirmado — <%= negocio.nombre %></title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-  <link rel="stylesheet" href="/css/tienda.css">
-  <link rel="stylesheet" href="/css/checkout.css">
-</head>
-<body class="ct-page">
-  <main class="confirmacion-main">
-    <div class="confirmacion-card">
-      <div class="confirmacion-icon">&#x2705;</div>
-      <h1>Pedido recibido</h1>
-      <p class="confirmacion-id">N&deg; <strong><%= pedido.pedidoId %></strong></p>
-      <p class="confirmacion-msg">
-        <%= negocio.nombre %> recibira tu pedido en breve. Te contactaremos por
-        <% if (pedido.cliente.email) { %>email<% } %><% if (pedido.cliente.telefono) { %> y WhatsApp<% } %>
-        cuando este confirmado y cuando un repartidor este en camino.
-      </p>
+<html lang="es-MX" data-type="<%= negocio.tipo %>">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pedido confirmado — <%= negocio.nombre %></title>
+    <link rel="stylesheet" href="/css/tienda.css" />
+    <link rel="stylesheet" href="/css/checkout.css" />
+  </head>
+  <body data-type="<%= negocio.tipo %>">
+    <main class="confirmacion-main">
+      <div class="confirmacion-card">
+        <div class="confirmacion-icon">✓</div>
+        <h1>Pedido recibido</h1>
+        <span class="confirmacion-id"><%= pedido.pedidoId %></span>
+        <p class="confirmacion-msg">
+          <strong><%= negocio.nombre %></strong> recibira tu pedido en breve. Te avisaremos por
+          email <% if (pedido.cliente.telefono) { %>y WhatsApp<% } %> cuando este confirmado y
+          cuando un repartidor este en camino.
+        </p>
 
-      <div class="confirmacion-detalles">
-        <h3>Detalles del pedido</h3>
-        <ul>
-          <% for (const prod of pedido.productos) { %>
-          <li>
-            <span><%= prod.cantidad %>x <%= prod.nombre %></span>
-            <span>$<%= (prod.precioUnitario * prod.cantidad).toFixed(2) %></span>
-          </li>
-          <% } %>
-        </ul>
-        <div class="confirmacion-total">
-          <span>Total</span>
-          <span>$<%= pedido.total.toFixed(2) %></span>
+        <div class="confirmacion-detalles">
+          <h3>Detalles del pedido</h3>
+          <ul>
+            <% for (const prod of pedido.productos) { %>
+            <li>
+              <span><%= prod.cantidad %>x <%= prod.nombre %></span>
+              <span>$<%= (prod.precioUnitario * prod.cantidad).toFixed(2) %></span>
+            </li>
+            <% } %>
+          </ul>
+          <div class="confirmacion-total">
+            <span>Total</span>
+            <span>$<%= pedido.total.toFixed(2) %></span>
+          </div>
         </div>
-      </div>
 
-      <div class="confirmacion-direccion">
-        <h3>Direccion de entrega</h3>
-        <p><%= pedido.cliente.direccion %></p>
-      </div>
+        <div class="confirmacion-direccion">
+          <h3>Direccion de entrega</h3>
+          <p><%= pedido.cliente.direccion %></p>
+        </div>
 
-      <a href="/tienda/<%= negocio.slug %>" class="confirmacion-back">Volver al catalogo</a>
-    </div>
-  </main>
-</body>
+        <a href="/tienda/<%= negocio.slug %>" class="confirmacion-back">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+          Volver al catalogo
+        </a>
+      </div>
+    </main>
+  </body>
 </html>
