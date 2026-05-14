@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp/
+.pnp.js
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+coverage/
+.nyc_output/
+
+# Logs
+logs/
+*.log
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+
+# Testing
+.vitest-cache/
+
+# Secrets (no committear nunca en plaintext)
+*.pem
+*.key
+*.crt
+secrets/
+!*.sealedsecret.yaml
+
+# Kubernetes local
+.kube/
+
+# Docker
+.docker/
+
+# Backup files
+*.backup
+*.bak
+*.old
+
+# Tekton local runs
+.tekton-cache/

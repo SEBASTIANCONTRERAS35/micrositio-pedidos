@@ -1,0 +1,98 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: micrositio-mongodb
+    restart: unless-stopped
+    command: ['--replSet', 'rs0', '--bind_ip_all']
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb-init:
+    image: mongo:7.0
+    container_name: micrositio-mongodb-init
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: 'no'
+    command: >
+      mongosh --host mongodb:27017 --eval
+      "try { rs.status(); print('Replica Set ya inicializado'); }
+       catch(e) { rs.initiate({_id:'rs0', members:[{_id:0, host:'mongodb:27017'}]}); print('Replica Set inicializado'); }"
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: micrositio-redis
+    restart: unless-stopped
+    command: ['redis-server', '--requirepass', 'devpassword', '--appendonly', 'yes']
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', 'devpassword', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+      target: dev
+    container_name: micrositio-api
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongodb-init:
+        condition: service_completed_successfully
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      MONGODB_URI: 'mongodb://mongodb:27017/micrositio?replicaSet=rs0&directConnection=true'
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: devpassword
+      LOG_LEVEL: debug
+    volumes:
+      - ./api:/app
+      - /app/node_modules
+
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+      target: dev
+    container_name: micrositio-worker
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongodb-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: development
+      MONGODB_URI: 'mongodb://mongodb:27017/micrositio?replicaSet=rs0&directConnection=true'
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: devpassword
+    volumes:
+      - ./worker:/app
+      - /app/node_modules
+
+volumes:
+  mongodb-data:
+  redis-data:

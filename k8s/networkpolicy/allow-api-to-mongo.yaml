@@ -1,0 +1,45 @@
+# API puede conectarse a MongoDB
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-to-mongo
+  namespace: micrositio
+spec:
+  podSelector:
+    matchLabels:
+      app: api
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: mongodb
+      ports:
+        - protocol: TCP
+          port: 27017
+---
+# MongoDB acepta de api y worker (worker tambien lee/escribe via mongoose)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-mongo-from-api-worker
+  namespace: micrositio
+spec:
+  podSelector:
+    matchLabels:
+      app: mongodb
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api
+        - podSelector:
+            matchLabels:
+              app: worker
+        - podSelector:
+            matchLabels:
+              app: mongodb  # entre nodos del Replica Set
+      ports:
+        - protocol: TCP
+          port: 27017

@@ -1,0 +1,60 @@
+{
+  "name": "micrositio-api",
+  "version": "0.1.0",
+  "description": "API + servidor web del micrositio de pedidos y delivery",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node api.js",
+    "dev": "nodemon api.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{js,json,md,ejs}\"",
+    "format:check": "prettier --check \"**/*.{js,json,md,ejs}\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:integration": "vitest run --config vitest.integration.config.js",
+    "audit:security": "npm audit --audit-level=high",
+    "prepare": "cd .. && husky api/.husky"
+  },
+  "dependencies": {
+    "argon2": "^0.41.1",
+    "bullmq": "^5.21.0",
+    "compression": "^1.7.5",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "ejs": "^3.1.10",
+    "express": "^5.0.1",
+    "express-mongo-sanitize": "^2.2.0",
+    "express-session": "^1.18.1",
+    "helmet": "^8.0.0",
+    "hpp": "^0.2.3",
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.8.4",
+    "pino": "^9.5.0",
+    "pino-http": "^10.3.0",
+    "rate-limiter-flexible": "^5.0.4",
+    "uuid": "^11.0.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.8",
+    "eslint": "^9.16.0",
+    "eslint-config-prettier": "^9.1.0",
+    "globals": "^15.13.0",
+    "ioredis-mock": "^8.9.0",
+    "mongodb-memory-server": "^10.1.2",
+    "msw": "^2.6.6",
+    "nodemon": "^3.1.7",
+    "pino-pretty": "^13.0.0",
+    "prettier": "^3.4.2",
+    "supertest": "^7.0.0",
+    "testcontainers": "^10.13.2",
+    "vitest": "^2.1.8"
+  }
+}

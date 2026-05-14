@@ -1,0 +1,25 @@
+# Ejemplo de PipelineRun para gatillar manualmente
+# kubectl create -f tekton/pipelinerun-example.yaml
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: micrositio-build-
+  namespace: tekton-pipelines
+spec:
+  pipelineRef:
+    name: micrositio-build
+  workspaces:
+    - name: source
+      volumeClaimTemplate:
+        spec:
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 1Gi
+          storageClassName: nfs-csi
+    - name: dockerconfig
+      secret:
+        secretName: docker-credentials
+  params:
+    - name: revision
+      value: main

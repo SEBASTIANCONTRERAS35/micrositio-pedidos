@@ -1,0 +1,40 @@
+{
+  "name": "micrositio-pedidos",
+  "version": "0.1.0",
+  "description": "Micrositio publico de pedidos y delivery con Kubernetes en produccion",
+  "private": true,
+  "workspaces": [
+    "api",
+    "worker"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "format": "prettier --write \"**/*.{js,json,md,ejs,yaml,yml}\"",
+    "format:check": "prettier --check \"**/*.{js,json,md,ejs,yaml,yml}\"",
+    "test": "npm run test --workspaces",
+    "audit:security": "npm audit --audit-level=high"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.6.0",
+    "@commitlint/config-conventional": "^19.6.0",
+    "eslint": "^9.16.0",
+    "globals": "^15.13.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.4.2"
+  },
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yaml,yml,ejs}": [
+      "prettier --write"
+    ]
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
+  }
+}

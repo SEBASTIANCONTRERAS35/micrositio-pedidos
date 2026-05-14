@@ -1,0 +1,71 @@
+# ═══════════════════════════════════════════════════════════════════
+# PrometheusRule (BONUS +2 pts)
+# Alertas para AlertManager
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: micrositio-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  groups:
+    - name: micrositio.api
+      interval: 30s
+      rules:
+        - alert: ApiHighErrorRate
+          expr: |
+            sum(rate(http_requests_total{namespace="micrositio", app="api", status=~"5.."}[2m]))
+            /
+            sum(rate(http_requests_total{namespace="micrositio", app="api"}[2m])) > 0.05
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Tasa de errores 5xx > 5% en API"
+            description: "Mas del 5% de las requests del API estan fallando"
+
+        - alert: ApiHighLatency
+          expr: |
+            histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{namespace="micrositio", app="api"}[2m])) by (le)) > 2
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "P99 latencia del API > 2s"
+
+        - alert: PodRestartingFrequently
+          expr: |
+            rate(kube_pod_container_status_restarts_total{namespace="micrositio"}[10m]) > 0.01
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod {{ $labels.pod }} se reinicia frecuentemente"
+
+    - name: micrositio.queue
+      interval: 30s
+      rules:
+        - alert: QueueBacklogHigh
+          # Metric custom expuesta por el worker (TODO: implementar exporter)
+          expr: |
+            redis_list_length{key="bull:notificaciones:wait"} > 100
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Cola de notificaciones acumulada"
+            description: "Mas de 100 jobs pendientes en cola, KEDA deberia estar escalando"
+
+    - name: micrositio.mongodb
+      interval: 30s
+      rules:
+        - alert: MongoDBNoPrimary
+          expr: mongodb_replset_my_state{set="rs0"} != 1 and mongodb_replset_my_state{set="rs0"} != 2
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "MongoDB no tiene PRIMARY"
+            description: "El Replica Set esta sin nodo primario, las escrituras fallan"
