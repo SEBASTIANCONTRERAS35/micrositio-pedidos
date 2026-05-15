@@ -28,6 +28,16 @@ const limiterAuth = new RateLimiterRedis({
   blockDuration: 60 * 60, // bloquea 1 hora si se excede
 });
 
+// Endpoints sensibles que no son login: refresh y logout. Mas permisivo que
+// el login (los refresh tokens son de 256 bits, fuerza bruta inviable) pero
+// igual acotado para que no se puedan martillar.
+const limiterSensitive = new RateLimiterRedis({
+  storeClient: redis,
+  keyPrefix: 'rl:sensitive',
+  points: 30, // 30 req
+  duration: 60, // por minuto
+});
+
 function makeLimiter(limiter) {
   return async (req, res, next) => {
     try {
@@ -44,4 +54,5 @@ module.exports = {
   publicLimiter: makeLimiter(limiterPublic),
   webhookLimiter: makeLimiter(limiterWebhook),
   authLimiter: makeLimiter(limiterAuth),
+  sensitiveLimiter: makeLimiter(limiterSensitive),
 };

@@ -62,6 +62,13 @@ const pedidoSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    // Referencia estable que ve ZUYU (= Idempotency-Key del cliente cuando
+    // existe). En reintentos se reusa, asi ZUYU deduplica y no crea Ventas
+    // duplicadas. Sparse: los pedidos en modo mock no la tienen.
+    referenciaExterna: {
+      type: String,
+      index: { sparse: true },
+    },
     negocioId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Negocio',

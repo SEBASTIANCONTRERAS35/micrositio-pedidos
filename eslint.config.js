@@ -50,6 +50,22 @@ module.exports = [
     },
   },
   {
+    // Scripts del cliente (browser): globals distintos y las funciones
+    // top-level (cartStore, loginForm, ...) las invoca Alpine via x-data,
+    // asi que eslint no las "ve" usadas.
+    files: ['**/public/js/**/*.js'],
+    languageOptions: {
+      sourceType: 'script',
+      globals: {
+        ...globals.browser,
+      },
+    },
+    rules: {
+      'no-unused-vars': 'off',
+      'no-console': 'off',
+    },
+  },
+  {
     ignores: [
       'node_modules/**',
       'dist/**',

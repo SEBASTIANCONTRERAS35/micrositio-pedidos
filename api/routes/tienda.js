@@ -9,7 +9,6 @@ const Negocio = require('../models/negocio');
 const Pedido = require('../models/pedido');
 const { tiendaCache } = require('../services/cache');
 const zuyu = require('../services/zuyu');
-const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -22,42 +21,17 @@ router.get('/:slug', async (req, res) => {
     return res.render('tienda/index', cached);
   }
 
-  // Fuente de verdad: ZUYU (en mock = mongo local)
+  // Fuente de verdad: ZUYU (en mock = mongo local). getCatalogo ya devuelve
+  // la "vista de catalogo" normalizada por el ACL mapper — la ruta NO
+  // re-mapea ni re-agrupa: solo cachea y renderea.
   const catalogo = await zuyu.getCatalogo(slug);
   if (!catalogo) {
     return res.status(404).render('tienda/404', { mensaje: 'Negocio no encontrado' });
   }
 
-  // Convertir _id a id para template (compatibilidad con datos de ZUYU)
-  const productos = catalogo.productos.map((p) => ({
-    _id: p.id || p._id,
-    nombre: p.nombre,
-    descripcion: p.descripcion,
-    precio: p.precio,
-    stock: p.stock,
-    categoria: p.categoria,
-    imagen: p.imagen,
-  }));
-
-  // Agrupar por categoria
-  const porCategoria = {};
-  for (const p of productos) {
-    const cat = p.categoria || 'General';
-    if (!porCategoria[cat]) {
-      porCategoria[cat] = [];
-    }
-    porCategoria[cat].push(p);
-  }
-
-  const data = {
-    negocio: { ...catalogo.negocio, slug },
-    porCategoria,
-    promociones: catalogo.promociones || [],
-  };
-
   // Cache largo (1 hora). ZUYU manda webhook para invalidar antes si hay cambios.
-  tiendaCache.set(slug, data, 60 * 60 * 1000);
-  res.render('tienda/index', data);
+  tiendaCache.set(slug, catalogo, 60 * 60 * 1000);
+  res.render('tienda/index', catalogo);
 });
 
 router.get('/:slug/checkout', async (req, res) => {

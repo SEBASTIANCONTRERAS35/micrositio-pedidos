@@ -1,4 +1,4 @@
-const { describe, it, expect } = require('vitest');
+// describe/it/expect globales (vitest.config.js → globals: true)
 const { z } = require('zod');
 const { validate } = require('../../middlewares/validation');
 

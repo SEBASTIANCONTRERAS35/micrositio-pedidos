@@ -1,49 +1,35 @@
 /**
  * Test critico: 10 pedidos concurrentes del ultimo producto.
- * Solo 1 debe tener exito, 9 deben fallar con StockInsuficiente.
+ * Solo 1 debe tener exito — valida la invariante de stock atomico que
+ * F2-deep movio a productoRepository.descontarStock (filtro $gte condicional).
  *
- * Levanta MongoDB Replica Set real con Testcontainers.
+ * Usa MongoMemoryReplSet (mongodb-memory-server): Replica Set real en memoria,
+ * necesario para transacciones multi-doc.
+ *
+ * describe/it/expect/beforeAll/afterAll globales (vitest.integration.config.js
+ * → globals: true). NO usar require('vitest') — Vitest 2.x lo rechaza.
  */
-const { describe, it, expect, beforeAll, afterAll } = require('vitest');
-const { GenericContainer, Wait } = require('testcontainers');
+const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
 
-let mongoContainer;
-let MONGO_URI;
+const Producto = require('../../models/producto');
+const Negocio = require('../../models/negocio');
+const productoRepo = require('../../infra/repositories/productoRepository');
+
+let replset;
 
 beforeAll(async () => {
-  mongoContainer = await new GenericContainer('mongo:7.0')
-    .withCommand(['--replSet', 'rs0', '--bind_ip_all'])
-    .withExposedPorts(27017)
-    .withWaitStrategy(Wait.forLogMessage('Waiting for connections'))
-    .withStartupTimeout(60000)
-    .start();
-
-  const port = mongoContainer.getMappedPort(27017);
-  MONGO_URI = `mongodb://localhost:${port}/test?directConnection=true`;
-
-  // Inicializar Replica Set
-  const tempConn = await mongoose.createConnection(MONGO_URI).asPromise();
-  await tempConn.db.admin().command({ replSetInitiate: { _id: 'rs0', members: [{ _id: 0, host: `localhost:${port}` }] } });
-  await tempConn.close();
-
-  // Esperar a que sea PRIMARY
-  await new Promise((r) => setTimeout(r, 3000));
-
-  await mongoose.connect(`mongodb://localhost:${port}/test?replicaSet=rs0&directConnection=true`);
-}, 90000);
+  replset = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
+  await mongoose.connect(replset.getUri());
+}, 60000);
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongoContainer?.stop();
+  await replset?.stop();
 });
 
 describe('Atomicidad de stock bajo concurrencia', () => {
   it('10 pedidos concurrentes del ultimo producto: solo 1 success', async () => {
-    const Producto = require('../../models/producto');
-    const Pedido = require('../../models/pedido');
-    const Negocio = require('../../models/negocio');
-
     // Setup: negocio + producto con stock=1
     const negocio = await Negocio.create({ slug: 'test-shop', nombre: 'Test Shop' });
     const producto = await Producto.create({
@@ -53,21 +39,20 @@ describe('Atomicidad de stock bajo concurrencia', () => {
       stock: 1,
     });
 
-    // 10 transacciones concurrentes intentando descontar stock
+    // 10 transacciones concurrentes — cada una usa el repo REAL (no se
+    // reimplementa la logica): asi el test cubre productoRepository.descontarStock.
     const intentos = Array.from({ length: 10 }).map(async () => {
       const session = await mongoose.startSession();
       try {
         let success = false;
         await session.withTransaction(async () => {
-          const r = await Producto.bulkWrite(
-            [{ updateOne: { filter: { _id: producto._id, stock: { $gte: 1 } }, update: { $inc: { stock: -1 } } } }],
-            { session }
-          );
-          if (r.modifiedCount !== 1) throw new Error('Stock insuficiente');
-          success = true;
+          success = await productoRepo.descontarStock([{ id: producto._id, cantidad: 1 }], session);
+          if (!success) {
+            throw new Error('Stock insuficiente');
+          }
         });
         return success;
-      } catch (e) {
+      } catch {
         return false;
       } finally {
         session.endSession();

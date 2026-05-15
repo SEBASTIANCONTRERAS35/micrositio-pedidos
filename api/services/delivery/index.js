@@ -11,7 +11,9 @@ const providers = { ivoy, lalamove, uberDirect };
 
 function getProvider(name) {
   const provider = providers[name];
-  if (!provider) throw new Error(`Provider de delivery desconocido: ${name}`);
+  if (!provider) {
+    throw new Error(`Provider de delivery desconocido: ${name}`);
+  }
   return provider;
 }
 

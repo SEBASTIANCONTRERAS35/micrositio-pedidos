@@ -7,37 +7,71 @@
  *   - Consultar estado de pedido      GET  /api/public/v1/orders/:ref
  *   - Healthcheck                     GET  /api/public/v1/health
  *
- * En modo MOCK (ZUYU_MOCK=true) usa el MongoDB local del micrositio, lo que
- * permite que el proyecto corra standalone. Con ZUYU_MOCK=false se integra
- * con ZUYU real via API key.
- *
- * Contrato (definido en ZUYU/backend/publicApi/v1/):
- *   - Auth: header  X-API-Key: zk_<env>_<...>
- *   - Catalogo:  { negocio, porCategoria, productos[], pagination }
- *   - Pedido in: { referenciaExterna, cliente, productos[], metodoPago, costoEnvio, notas }
- *   - Pedido out:{ referenciaExterna, zuyuVentaId, idVenta, subtotal, total, estado, fecha }
+ * CONFIG POR NEGOCIO: cada Negocio guarda su propia integracion en
+ * `zuyuConfig` (apiKey, baseUrl, etc.) — el dueno la captura desde el panel.
+ * Las variables de entorno ZUYU_* funcionan como FALLBACK para deployments
+ * sin UI (12-factor). Si `zuyuConfig.conectado` es false y no hay override
+ * por env, el cliente cae a modo MOCK (Mongo local del micrositio).
  */
 const logger = require('../utils/logger');
 const Producto = require('../models/producto');
 const Negocio = require('../models/negocio');
+const { decryptSecret } = require('../utils/crypto');
+const { toCatalogoVista } = require('../infra/gateways/zuyuMapper');
 
-const BASE_URL = process.env.ZUYU_BASE_URL || 'https://api.zuyu.mx';
-const API_KEY = process.env.ZUYU_API_KEY;
-const IS_MOCK = process.env.ZUYU_MOCK !== 'false';
 const TIMEOUT_MS = parseInt(process.env.ZUYU_TIMEOUT_MS || '8000', 10);
+
+/**
+ * Resuelve la config de ZUYU para un negocio. DB primero, env como fallback.
+ *
+ * @param {string} [slug] - slug del negocio. Sin slug, solo aplica el fallback env.
+ * @returns {Promise<{conectado:boolean, baseUrl:string, apiKey:?string,
+ *   webhookSecret:?string, webhookSecretPrevio:?string}>}
+ */
+async function resolverConfig(slug) {
+  let cfg = {};
+  if (slug) {
+    const negocio = await Negocio.findOne({ slug })
+      .select('+zuyuConfig.apiKey +zuyuConfig.webhookSecret +zuyuConfig.webhookSecretPrevio')
+      .lean();
+    cfg = negocio?.zuyuConfig || {};
+  }
+
+  // Los secretos se guardan cifrados at-rest — decryptSecret los descifra
+  // (y devuelve tal cual los valores legacy en claro). El env es fallback.
+  const apiKey =
+    (cfg.apiKey ? decryptSecret(cfg.apiKey) : null) || process.env.ZUYU_API_KEY || null;
+  const baseUrl = cfg.baseUrl || process.env.ZUYU_BASE_URL || 'https://api.zuyu.mx';
+  const webhookSecret =
+    (cfg.webhookSecret ? decryptSecret(cfg.webhookSecret) : null) ||
+    process.env.ZUYU_WEBHOOK_SECRET ||
+    null;
+  const webhookSecretPrevio =
+    (cfg.webhookSecretPrevio ? decryptSecret(cfg.webhookSecretPrevio) : null) ||
+    process.env.ZUYU_WEBHOOK_SECRET_PREVIO ||
+    null;
+
+  // Conectado si: el dueno lo activo en el panel (flagUI) O el deployment lo
+  // fuerza por env (ZUYU_MOCK=false). En ambos casos hace falta un apiKey real.
+  const flagUI = cfg.conectado === true;
+  const flagEnv = process.env.ZUYU_MOCK === 'false';
+  const conectado = (flagUI || flagEnv) && !!apiKey;
+
+  return { conectado, baseUrl, apiKey, webhookSecret, webhookSecretPrevio };
+}
 
 /**
  * fetch con timeout + header de auth. Lanza Error con .status si la
  * respuesta no es OK.
  */
-async function fetchZuyu(path, options = {}) {
+async function fetchZuyu(path, cfg, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(`${BASE_URL}/api/public/v1${path}`, {
+    const res = await fetch(`${cfg.baseUrl}/api/public/v1${path}`, {
       ...options,
       headers: {
-        'X-API-Key': API_KEY,
+        'X-API-Key': cfg.apiKey || '',
         'Content-Type': 'application/json',
         ...options.headers,
       },
@@ -62,23 +96,22 @@ async function fetchZuyu(path, options = {}) {
 }
 
 /**
- * Obtiene el catalogo de un negocio.
- * Devuelve { negocio, porCategoria, productos[] } — mismo shape que la
- * vista EJS espera.
+ * Obtiene el catalogo de un negocio como "vista de catalogo" normalizada
+ * (ver infra/gateways/zuyuMapper.js). El mapper es el anti-corruption layer:
+ * conectado o mock, las rutas reciben SIEMPRE el mismo shape.
+ *
+ * @returns {object|null} vista de catalogo, o null si el negocio no existe (mock)
  */
 async function getCatalogo(slug) {
-  if (IS_MOCK) {
+  const cfg = await resolverConfig(slug);
+  if (!cfg.conectado) {
     return getCatalogoMock(slug);
   }
 
-  // En modo real, ZUYU resuelve el negocio desde el API key.
-  const data = await fetchZuyu('/catalog');
-  return {
-    negocio: { ...data.negocio, slug: data.negocio.slug || slug },
-    productos: data.productos,
-    porCategoria: data.porCategoria,
-    promociones: [],
-  };
+  // En modo real, ZUYU resuelve el negocio desde el API key. El mapper
+  // absorbe el shape de ZUYU — las vistas nunca lo ven crudo.
+  const data = await fetchZuyu('/catalog', cfg);
+  return toCatalogoVista(data, slug);
 }
 
 /**
@@ -87,14 +120,15 @@ async function getCatalogo(slug) {
  *
  * @param {string} slug
  * @param {object} pedidoData - { referenciaExterna, cliente, productos[], metodoPago, costoEnvio, notas }
- * @returns {object} { referenciaExterna, zuyuVentaId, idVenta, subtotal, total, estado, fecha }
+ * @returns {object|null} respuesta de ZUYU, o null si el negocio esta en mock
  */
 async function crearPedido(slug, pedidoData) {
-  if (IS_MOCK) {
+  const cfg = await resolverConfig(slug);
+  if (!cfg.conectado) {
     return null;
   } // en mock, pedidoService maneja stock localmente
 
-  return fetchZuyu('/orders', {
+  return fetchZuyu('/orders', cfg, {
     method: 'POST',
     body: JSON.stringify(pedidoData),
   });
@@ -103,22 +137,24 @@ async function crearPedido(slug, pedidoData) {
 /**
  * Consulta el estado de un pedido en ZUYU por su referencia.
  */
-async function getEstadoPedido(referenciaExterna) {
-  if (IS_MOCK) {
+async function getEstadoPedido(referenciaExterna, slug) {
+  const cfg = await resolverConfig(slug);
+  if (!cfg.conectado) {
     return null;
   }
-  return fetchZuyu(`/orders/${encodeURIComponent(referenciaExterna)}`);
+  return fetchZuyu(`/orders/${encodeURIComponent(referenciaExterna)}`, cfg);
 }
 
 /**
- * Healthcheck del API de ZUYU.
+ * Healthcheck del API de ZUYU para un negocio.
  */
-async function ping() {
-  if (IS_MOCK) {
+async function ping(slug) {
+  const cfg = await resolverConfig(slug);
+  if (!cfg.conectado) {
     return { ok: true, mode: 'mock' };
   }
   try {
-    const r = await fetchZuyu('/health');
+    const r = await fetchZuyu('/health', cfg);
     return { ok: r.status === 'ok', ...r };
   } catch (e) {
     logger.error({ err: e.message }, 'ZUYU ping failed');
@@ -126,7 +162,16 @@ async function ping() {
   }
 }
 
+/**
+ * True si el negocio esta conectado a ZUYU (no en modo mock).
+ */
+async function estaConectado(slug) {
+  const cfg = await resolverConfig(slug);
+  return cfg.conectado;
+}
+
 // ── MODO MOCK: usa el MongoDB local del micrositio ─────────────────
+// Devuelve el mismo shape que el modo conectado — el mapper lo normaliza.
 async function getCatalogoMock(slug) {
   const negocio = await Negocio.findOne({ slug, activo: true }).lean();
   if (!negocio) {
@@ -136,36 +181,14 @@ async function getCatalogoMock(slug) {
     .select('nombre descripcion precio stock categoria imagen')
     .lean();
 
-  const porCategoria = {};
-  for (const p of productos) {
-    const cat = p.categoria || 'General';
-    if (!porCategoria[cat]) {
-      porCategoria[cat] = [];
-    }
-    porCategoria[cat].push({ ...p, _id: p._id });
-  }
-
-  return {
-    negocio: { ...negocio, slug },
-    productos: productos.map((p) => ({
-      _id: p._id,
-      id: p._id.toString(),
-      nombre: p.nombre,
-      descripcion: p.descripcion,
-      precio: p.precio,
-      stock: p.stock,
-      categoria: p.categoria,
-      imagen: p.imagen,
-    })),
-    porCategoria,
-    promociones: [],
-  };
+  return toCatalogoVista({ negocio, productos }, slug);
 }
 
 module.exports = {
+  resolverConfig,
   getCatalogo,
   crearPedido,
   getEstadoPedido,
   ping,
-  IS_MOCK,
+  estaConectado,
 };

@@ -37,39 +37,38 @@ const PedidoSchema = z.object({
 });
 
 // POST /api/pedidos — publico, con idempotencia y rate limit
-router.post(
-  '/',
-  publicLimiter,
-  idempotency,
-  validate(PedidoSchema),
-  async (req, res, next) => {
-    try {
-      const pedido = await crearPedidoConStock(req.body);
-      res.status(201).json({
-        pedidoId: pedido.pedidoId,
-        estado: pedido.estado,
-        total: pedido.total,
-      });
-    } catch (e) {
-      next(e);
-    }
+router.post('/', publicLimiter, idempotency, validate(PedidoSchema), async (req, res, next) => {
+  try {
+    // El Idempotency-Key (header) se pasa al service para usarlo como
+    // referenciaExterna estable hacia ZUYU (ver crearPedidoViaZuyu).
+    const pedido = await crearPedidoConStock({
+      ...req.body,
+      idempotencyKey: req.headers['idempotency-key'] || null,
+    });
+    res.status(201).json({
+      pedidoId: pedido.pedidoId,
+      estado: pedido.estado,
+      total: pedido.total,
+    });
+  } catch (e) {
+    next(e);
   }
-);
+});
 
-// POST /api/pedidos/:id/confirmar — solo dueno
+// POST /api/pedidos/:id/confirmar — solo dueno (scoped a su negocio)
 router.post('/:id/confirmar', requireAuth, async (req, res, next) => {
   try {
-    const pedido = await confirmarPedido(req.params.id, req.user.id);
+    const pedido = await confirmarPedido(req.params.id, req.user.id, req.user.negocioId);
     res.json({ pedidoId: pedido.pedidoId, estado: pedido.estado });
   } catch (e) {
     next(e);
   }
 });
 
-// POST /api/pedidos/:id/cancelar — solo dueno
+// POST /api/pedidos/:id/cancelar — solo dueno (scoped a su negocio)
 router.post('/:id/cancelar', requireAuth, async (req, res, next) => {
   try {
-    const pedido = await cancelarPedido(req.params.id, req.user.id);
+    const pedido = await cancelarPedido(req.params.id, req.user.id, req.user.negocioId);
     res.json({ pedidoId: pedido.pedidoId, estado: pedido.estado });
   } catch (e) {
     next(e);
