@@ -48,7 +48,9 @@ async function requestDelivery(pedido) {
     body,
   });
 
-  if (!res.ok) throw new Error(`Lalamove returned ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    throw new Error(`Lalamove returned ${res.status}: ${await res.text()}`);
+  }
   const data = await res.json();
 
   return {
@@ -60,22 +62,30 @@ async function requestDelivery(pedido) {
 }
 
 async function getStatus(deliveryId) {
-  if (IS_MOCK) return { estado: 'pickup' };
+  if (IS_MOCK) {
+    return { estado: 'pickup' };
+  }
   // TODO real
   return { estado: 'pending' };
 }
 
 async function cancelDelivery(deliveryId) {
-  if (IS_MOCK) return { ok: true };
+  if (IS_MOCK) {
+    return { ok: true };
+  }
   return { ok: false };
 }
 
 function verifyWebhook(body, headers) {
   const secret = process.env.WEBHOOK_SECRET_LALAMOVE;
-  if (!secret) return true; // dev only
+  if (!secret) {
+    return true;
+  } // dev only
   const signature = headers['x-lalamove-signature'];
   const timestamp = headers['x-lalamove-timestamp'];
-  if (!isTimestampValid(timestamp)) return false;
+  if (!isTimestampValid(timestamp)) {
+    return false;
+  }
   return verifyHmacSignature(`${timestamp}.${body}`, signature, secret);
 }
 

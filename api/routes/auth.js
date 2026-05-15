@@ -5,9 +5,16 @@ const express = require('express');
 const { z } = require('zod');
 const Usuario = require('../models/usuario');
 const { verifyPassword } = require('../services/auth/argon2');
-const { signAccessToken, issueRefreshToken, rotateRefreshToken, revokeRefreshToken } = require('../services/auth/jwt');
+const {
+  signAccessToken,
+  issueRefreshToken,
+  rotateRefreshToken,
+  revokeRefreshToken,
+  revokeAccessToken,
+} = require('../services/auth/jwt');
 const { validate } = require('../middlewares/validation');
-const { authLimiter } = require('../middlewares/rateLimit');
+const { authLimiter, sensitiveLimiter } = require('../middlewares/rateLimit');
+const requireAuth = require('../middlewares/auth');
 const { AuthenticationError } = require('../utils/errors');
 
 const router = express.Router();
@@ -45,11 +52,13 @@ router.post('/login', authLimiter, validate(LoginSchema), async (req, res, next)
 });
 
 // POST /api/auth/refresh
-router.post('/refresh', validate(RefreshSchema), async (req, res, next) => {
+router.post('/refresh', sensitiveLimiter, validate(RefreshSchema), async (req, res, next) => {
   try {
     const { userId, newToken } = await rotateRefreshToken(req.body.refreshToken);
     const usuario = await Usuario.findById(userId);
-    if (!usuario || !usuario.activo) throw new AuthenticationError('Usuario invalido');
+    if (!usuario || !usuario.activo) {
+      throw new AuthenticationError('Usuario invalido');
+    }
 
     const accessToken = signAccessToken({
       sub: usuario._id.toString(),
@@ -63,14 +72,22 @@ router.post('/refresh', validate(RefreshSchema), async (req, res, next) => {
   }
 });
 
-// POST /api/auth/logout
-router.post('/logout', validate(RefreshSchema), async (req, res, next) => {
-  try {
-    await revokeRefreshToken(req.body.refreshToken);
-    res.json({ ok: true });
-  } catch (e) {
-    next(e);
+// POST /api/auth/logout — revoca el refresh token Y el access token actual.
+// requireAuth nos da el jti del access token para meterlo en la blacklist.
+router.post(
+  '/logout',
+  sensitiveLimiter,
+  requireAuth,
+  validate(RefreshSchema),
+  async (req, res, next) => {
+    try {
+      await revokeRefreshToken(req.body.refreshToken);
+      await revokeAccessToken(req.user.jti, req.user.exp);
+      res.json({ ok: true });
+    } catch (e) {
+      next(e);
+    }
   }
-});
+);
 
 module.exports = router;

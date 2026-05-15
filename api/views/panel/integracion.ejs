@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Integración con ZUYU — <%= negocio.nombre %></title>
+    <link rel="stylesheet" href="/css/panel.css" />
+    <script defer src="/js/alpine.min.js"></script>
+  </head>
+  <body x-data="integracionZuyu" x-init="load()">
+    <header class="panel-header">
+      <div class="panel-header__brand">
+        <div
+          class="panel-header__logo"
+          x-text="negocio.nombre ? negocio.nombre.charAt(0) : 'M'"
+        ></div>
+        <h1 x-text="negocio.nombre || 'Panel'"></h1>
+      </div>
+      <div class="panel-header__user">
+        <span class="panel-header__user-email" x-text="usuario.email"></span>
+        <button class="panel-header__logout" @click="logout">Cerrar sesion</button>
+      </div>
+    </header>
+
+    <main class="panel-main">
+      <h1 class="panel-page-title">Integración con ZUYU</h1>
+      <p class="panel-page-subtitle">
+        Conecta el micrositio con tu negocio en ZUYU. Mientras no esté conectado, el catálogo viene
+        del modo demo local.
+      </p>
+
+      <nav class="panel-nav">
+        <a href="/panel/pedidos" class="panel-nav__link">Pedidos</a>
+        <a href="/panel/integracion" class="panel-nav__link panel-nav__link--active">Integración</a>
+      </nav>
+
+      <div class="panel-config-card" x-show="!loading" x-cloak>
+        <!-- Estado -->
+        <div
+          class="panel-status-badge"
+          :class="estado.conectado ? 'panel-status-badge--on' : 'panel-status-badge--off'"
+        >
+          <span
+            x-text="estado.conectado ? '● Conectado a ZUYU' : '○ Modo demo (sin conectar)'"
+          ></span>
+        </div>
+
+        <h2 class="panel-config-card__title">Credenciales de ZUYU</h2>
+        <p class="panel-config-card__hint">
+          Genera el API key desde la app de ZUYU: Configuración → Micrositio de Pedidos → Generar
+          API key. Cópialo y pégalo aquí.
+        </p>
+
+        <form @submit.prevent="guardar">
+          <div class="panel-form-group">
+            <label for="baseUrl">URL de ZUYU</label>
+            <input
+              type="url"
+              id="baseUrl"
+              x-model="form.baseUrl"
+              placeholder="https://pilldb-dev.onrender.com"
+            />
+            <p class="panel-form-group__help">El servidor de ZUYU. Debe empezar con https://</p>
+          </div>
+
+          <div class="panel-form-group">
+            <label for="apiKey">API Key</label>
+            <input
+              type="password"
+              id="apiKey"
+              x-model="form.apiKey"
+              autocomplete="off"
+              :placeholder="
+                estado.apiKeyConfigurada
+                  ? 'Configurada (' + estado.apiKeyPrefix + '••••••) — deja vacío para no cambiar'
+                  : 'Pega aquí el API key (zk_...)'
+              "
+            />
+            <p class="panel-form-group__help">
+              No se vuelve a mostrar después de guardar. Si ya hay una, déjalo vacío para
+              conservarla.
+            </p>
+          </div>
+
+          <div class="panel-form-group">
+            <label for="webhookSecret">Webhook Secret (opcional)</label>
+            <input
+              type="password"
+              id="webhookSecret"
+              x-model="form.webhookSecret"
+              autocomplete="off"
+              :placeholder="
+                estado.webhookSecretConfigurado
+                  ? 'Configurado — deja vacío para no cambiar'
+                  : 'Pega aquí el webhook secret'
+              "
+            />
+            <p class="panel-form-group__help">
+              Sirve para validar las notificaciones de stock que envía ZUYU.
+            </p>
+          </div>
+
+          <div class="panel-form-check">
+            <input type="checkbox" id="conectado" x-model="form.conectado" />
+            <div>
+              <label for="conectado">Conectar con ZUYU</label>
+              <p class="panel-form-check__help">
+                Al activarlo, el catálogo y el stock vienen de ZUYU en vez del modo demo. Requiere
+                un API key configurado.
+              </p>
+            </div>
+          </div>
+
+          <button type="submit" class="panel-btn-primary" :disabled="saving">
+            <span x-show="!saving">Guardar configuración</span>
+            <span x-show="saving" x-cloak>Guardando...</span>
+          </button>
+
+          <p
+            x-show="msg"
+            x-cloak
+            class="panel-form-msg"
+            :class="msgOk ? 'panel-form-msg--ok' : 'panel-form-msg--err'"
+            x-text="msg"
+          ></p>
+        </form>
+      </div>
+    </main>
+
+    <script defer src="/js/panel-integracion.js"></script>
+  </body>
+</html>

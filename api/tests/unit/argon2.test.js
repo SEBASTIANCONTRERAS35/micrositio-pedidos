@@ -1,4 +1,4 @@
-const { describe, it, expect } = require('vitest');
+// describe/it/expect globales (vitest.config.js → globals: true)
 const { hashPassword, verifyPassword } = require('../../services/auth/argon2');
 
 describe('Argon2 password hashing', () => {

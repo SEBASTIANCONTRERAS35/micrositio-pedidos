@@ -23,6 +23,8 @@ async function requireAuth(req, res, next) {
       id: payload.sub,
       email: payload.email,
       negocioId: payload.negocioId,
+      jti: payload.jti, // necesario para revocar el token en logout
+      exp: payload.exp, // TTL del blacklist al revocar
     };
     next();
   } catch (err) {

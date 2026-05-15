@@ -60,6 +60,9 @@ function signAccessToken(payload) {
     algorithm: 'RS256',
     expiresIn: ACCESS_TTL,
     issuer: 'micrositio-api',
+    // jti unico por token — SIN esto isAccessTokenRevoked() nunca puede
+    // funcionar (payload.jti seria undefined) y la blacklist es inutil.
+    jwtid: crypto.randomBytes(16).toString('hex'),
   });
 }
 
@@ -71,7 +74,9 @@ async function issueRefreshToken(userId) {
 
 async function rotateRefreshToken(oldToken) {
   const userId = await redis.get(`refresh:${oldToken}`);
-  if (!userId) throw new AuthenticationError('Refresh token invalido o expirado');
+  if (!userId) {
+    throw new AuthenticationError('Refresh token invalido o expirado');
+  }
   await redis.del(`refresh:${oldToken}`);
   return { userId, newToken: await issueRefreshToken(userId) };
 }
@@ -89,9 +94,27 @@ function verifyAccessToken(token) {
 }
 
 async function isAccessTokenRevoked(jti) {
-  if (!jti) return false;
+  if (!jti) {
+    return false;
+  }
   const exists = await redis.exists(`revoked:${jti}`);
   return exists === 1;
+}
+
+/**
+ * Revoca un access token por su jti (lo mete en la blacklist de Redis).
+ * El TTL = tiempo que le queda de vida al token: no tiene sentido guardar
+ * la entrada de blacklist mas alla de la expiracion natural del token.
+ *
+ * @param {string} jti - el jti del token
+ * @param {number} expiresAtUnix - claim `exp` del token (segundos Unix)
+ */
+async function revokeAccessToken(jti, expiresAtUnix) {
+  if (!jti) {
+    return;
+  }
+  const ttl = Math.max(1, (expiresAtUnix || 0) - Math.floor(Date.now() / 1000));
+  await redis.set(`revoked:${jti}`, '1', 'EX', ttl);
 }
 
 module.exports = {
@@ -101,4 +124,5 @@ module.exports = {
   revokeRefreshToken,
   verifyAccessToken,
   isAccessTokenRevoked,
+  revokeAccessToken,
 };

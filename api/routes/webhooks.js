@@ -6,9 +6,10 @@
 const express = require('express');
 const { Queue } = require('bullmq');
 const delivery = require('../services/delivery');
+const zuyu = require('../services/zuyu');
 const { webhookLimiter } = require('../middlewares/rateLimit');
 const { WebhookSignatureError } = require('../utils/errors');
-const { verifyHmacSignature, verifyZuyuSignature, isTimestampValid } = require('../utils/hmac');
+const { verifyZuyuSignature } = require('../utils/hmac');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -89,6 +90,7 @@ router.post(
 //               | stock_actualizado | pedido_confirmado
 //
 // Seguridad: HMAC estilo Stripe + dual-secret (rotacion) + replay protection.
+// El secret es POR NEGOCIO (zuyuConfig.webhookSecret) — NUNCA un secret global.
 // ═══════════════════════════════════════════════════════════════════
 router.post(
   '/zuyu',
@@ -96,29 +98,38 @@ router.post(
   express.raw({ type: 'application/json', limit: '50kb' }),
   async (req, res, next) => {
     try {
-      const secret = process.env.ZUYU_WEBHOOK_SECRET;
-      const secretPrevio = process.env.ZUYU_WEBHOOK_SECRET_PREVIO || null;
-
       const rawBody = req.body.toString('utf8');
       const signatureHeader = req.headers['x-zuyu-signature'];
       const eventIdHeader = req.headers['x-zuyu-event-id'];
 
-      if (secret) {
-        const secrets = [secret, secretPrevio].filter(Boolean);
-        if (!verifyZuyuSignature(rawBody, signatureHeader, secrets)) {
-          throw new WebhookSignatureError('Firma de webhook ZUYU invalida o expirada');
-        }
-      } else {
-        logger.warn('ZUYU_WEBHOOK_SECRET no configurado — webhook NO verificado (solo dev)');
+      // Parsear el body para saber QUE negocio — necesario para resolver su
+      // secret. La firma se verifica contra el rawBody crudo, no el parseado.
+      let payload;
+      try {
+        payload = JSON.parse(rawBody);
+      } catch {
+        return res.status(400).json({ error: 'INVALID_PAYLOAD', message: 'Body JSON invalido' });
       }
-
-      const payload = JSON.parse(rawBody);
       const { eventId, eventType, negocioSlug, data } = payload;
 
       if (!eventType || !negocioSlug) {
         return res
           .status(400)
           .json({ error: 'INVALID_PAYLOAD', message: 'eventType y negocioSlug requeridos' });
+      }
+
+      // Resolver el webhook secret DEL NEGOCIO que dice el payload. Verificar
+      // con ese secret ata negocioSlug a la firma: solo quien conoce el secret
+      // de ESE negocio puede firmar un evento valido para el.
+      const cfg = await zuyu.resolverConfig(negocioSlug);
+      const secrets = [cfg.webhookSecret, cfg.webhookSecretPrevio].filter(Boolean);
+      if (secrets.length === 0) {
+        // Sin secret configurado: NUNCA aceptar el webhook sin verificar.
+        logger.warn({ negocioSlug }, 'Webhook ZUYU rechazado: negocio sin webhook secret');
+        throw new WebhookSignatureError('Webhook secret no configurado para este negocio');
+      }
+      if (!verifyZuyuSignature(rawBody, signatureHeader, secrets)) {
+        throw new WebhookSignatureError('Firma de webhook ZUYU invalida o expirada');
       }
 
       // eventId del body o del header — jobId para idempotencia.

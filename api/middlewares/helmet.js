@@ -8,8 +8,11 @@ module.exports = helmet({
     useDefaults: false,
     directives: {
       defaultSrc: ["'self'"],
-      // Alpine.js requiere unsafe-eval para sus directivas inline (x-show, x-data)
-      scriptSrc: ["'self'", "'unsafe-eval'", "'unsafe-inline'"],
+      // 'unsafe-inline' YA NO se permite para scripts: todos los <script>
+      // inline se externalizaron a /js/*.js. 'unsafe-eval' SI se mantiene —
+      // Alpine.js (build estandar) evalua sus expresiones con Function();
+      // quitarlo requiere migrar al build CSP-friendly de Alpine.
+      scriptSrc: ["'self'", "'unsafe-eval'"],
       // EJS templates tienen estilos inline ocasionales
       styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       fontSrc: ["'self'", 'https://fonts.gstatic.com'],

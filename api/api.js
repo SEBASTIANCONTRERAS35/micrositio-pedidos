@@ -49,7 +49,10 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(helmetMw);
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || true,
+    // Sin CORS_ORIGIN configurado: NO permitir cross-origin. El micrositio
+    // sirve sus propias paginas same-origin; no hay consumidor cross-origin
+    // legitimo. `|| true` reflejaba cualquier origen — eso se quita.
+    origin: process.env.CORS_ORIGIN || false,
     credentials: false,
   })
 );

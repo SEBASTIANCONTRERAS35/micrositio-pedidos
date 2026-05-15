@@ -12,7 +12,9 @@ let cachedToken = null;
 let tokenExpiresAt = 0;
 
 async function getAccessToken() {
-  if (cachedToken && Date.now() < tokenExpiresAt) return cachedToken;
+  if (cachedToken && Date.now() < tokenExpiresAt) {
+    return cachedToken;
+  }
 
   const res = await fetch('https://login.uber.com/oauth/v2/token', {
     method: 'POST',
@@ -25,7 +27,9 @@ async function getAccessToken() {
     }),
   });
 
-  if (!res.ok) throw new Error(`Uber OAuth returned ${res.status}`);
+  if (!res.ok) {
+    throw new Error(`Uber OAuth returned ${res.status}`);
+  }
   const data = await res.json();
   cachedToken = data.access_token;
   tokenExpiresAt = Date.now() + (data.expires_in - 60) * 1000;
@@ -67,7 +71,9 @@ async function requestDelivery(pedido) {
     }),
   });
 
-  if (!res.ok) throw new Error(`Uber Direct returned ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    throw new Error(`Uber Direct returned ${res.status}: ${await res.text()}`);
+  }
   const data = await res.json();
 
   return {
@@ -79,19 +85,25 @@ async function requestDelivery(pedido) {
 }
 
 async function getStatus(deliveryId) {
-  if (IS_MOCK) return { estado: 'pickup' };
+  if (IS_MOCK) {
+    return { estado: 'pickup' };
+  }
   const token = await getAccessToken();
   const customerId = process.env.UBER_CUSTOMER_ID;
   const res = await fetch(`${BASE_URL}/customers/${customerId}/deliveries/${deliveryId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error(`Uber status returned ${res.status}`);
+  if (!res.ok) {
+    throw new Error(`Uber status returned ${res.status}`);
+  }
   const data = await res.json();
   return { estado: mapEstado(data.status) };
 }
 
 async function cancelDelivery(deliveryId) {
-  if (IS_MOCK) return { ok: true };
+  if (IS_MOCK) {
+    return { ok: true };
+  }
   const token = await getAccessToken();
   const customerId = process.env.UBER_CUSTOMER_ID;
   const res = await fetch(`${BASE_URL}/customers/${customerId}/deliveries/${deliveryId}/cancel`, {
@@ -103,7 +115,9 @@ async function cancelDelivery(deliveryId) {
 
 function verifyWebhook(body, headers) {
   const secret = process.env.WEBHOOK_SECRET_UBER;
-  if (!secret) return true; // dev only
+  if (!secret) {
+    return true;
+  } // dev only
   const signature = headers['x-uber-signature'];
   // Uber no envia timestamp explicito, depende del header X-Uber-Date
   return verifyHmacSignature(body, signature, secret);

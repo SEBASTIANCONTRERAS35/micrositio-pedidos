@@ -1,4 +1,4 @@
-const { describe, it, expect } = require('vitest');
+// describe/it/expect globales (vitest.config.js → globals: true)
 const { verifyHmacSignature, isTimestampValid, signHmac } = require('../../utils/hmac');
 
 describe('verifyHmacSignature', () => {
@@ -12,7 +12,9 @@ describe('verifyHmacSignature', () => {
 
   it('rechaza firma invalida', () => {
     const body = 'hello world';
-    expect(verifyHmacSignature(body, 'bad-signature-of-correct-length-aaaaaaaaaaaaaaaaaa', secret)).toBe(false);
+    expect(
+      verifyHmacSignature(body, 'bad-signature-of-correct-length-aaaaaaaaaaaaaaaaaa', secret)
+    ).toBe(false);
   });
 
   it('acepta firma con prefijo sha256=', () => {
