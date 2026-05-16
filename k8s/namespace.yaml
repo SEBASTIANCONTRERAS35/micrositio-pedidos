@@ -1,5 +1,7 @@
 # ═══════════════════════════════════════════════════════════════════
-# Namespace 'micrositio' con Pod Security Standards: Restricted
+# Namespace 'micrositio' con Pod Security Standards: Baseline
+# NOTA: baseline (no restricted) porque mongodb init-container necesita
+# root + CHOWN para preparar el keyfile de replica set authentication.
 # ═══════════════════════════════════════════════════════════════════
 apiVersion: v1
 kind: Namespace
@@ -7,8 +9,7 @@ metadata:
   name: micrositio
   labels:
     name: micrositio
-    # Pod Security Standards (built-in K8s 1.25+)
-    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/enforce-version: latest
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/warn: restricted
