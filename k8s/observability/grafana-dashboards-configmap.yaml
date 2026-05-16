@@ -1,0 +1,124 @@
+# ConfigMap con dashboard JSON para auto-import en Grafana (sidecar dashboard provider)
+# kube-prometheus-stack tiene un sidecar que carga ConfigMaps con label grafana_dashboard=1
+# El dashboard aparece automáticamente en Grafana → Dashboards → Browse
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-micrositio-overview
+  namespace: observability
+  labels:
+    grafana_dashboard: '1'
+    app.kubernetes.io/part-of: micrositio
+data:
+  micrositio-overview.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "graphTooltip": 0,
+      "title": "Micrositio — Overview",
+      "tags": ["micrositio"],
+      "timezone": "America/Mexico_City",
+      "schemaVersion": 39,
+      "refresh": "10s",
+      "time": { "from": "now-30m", "to": "now" },
+      "panels": [
+        {
+          "id": 1,
+          "title": "API — Request rate (req/s)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "sum by (route) (rate(http_requests_total{app=\"api\"}[1m]))",
+            "legendFormat": "{{route}}"
+          }]
+        },
+        {
+          "id": 2,
+          "title": "API — Latencia P95 (s)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [{
+            "expr": "histogram_quantile(0.95, sum by (route, le) (rate(http_request_duration_seconds_bucket{app=\"api\"}[5m])))",
+            "legendFormat": "{{route}} p95"
+          }]
+        },
+        {
+          "id": 3,
+          "title": "API — Error rate 5xx (%)",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "percentunit",
+            "thresholds": { "mode": "absolute", "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.01 },
+              { "color": "red", "value": 0.05 }
+            ]}
+          }},
+          "targets": [{
+            "expr": "sum(rate(http_requests_total{app=\"api\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{app=\"api\"}[5m]))"
+          }]
+        },
+        {
+          "id": 4,
+          "title": "Worker — réplicas (KEDA)",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [{
+            "expr": "kube_deployment_status_replicas{namespace=\"micrositio\",deployment=\"worker\"}"
+          }]
+        },
+        {
+          "id": 5,
+          "title": "Redis — Cola BullMQ (jobs pendientes)",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [{
+            "expr": "redis_list_length{key=~\"bull:.+:wait\"}",
+            "legendFormat": "{{key}}"
+          }]
+        },
+        {
+          "id": 6,
+          "title": "MongoDB — Réplicas Healthy",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 14 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": {
+            "thresholds": { "mode": "absolute", "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 2 },
+              { "color": "green", "value": 3 }
+            ]}
+          }},
+          "targets": [{
+            "expr": "sum(kube_pod_status_ready{namespace=\"micrositio\",pod=~\"mongodb-.+\",condition=\"true\"})"
+          }]
+        },
+        {
+          "id": 7,
+          "title": "Pedidos creados (último 1h)",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 14 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [{ "expr": "sum(increase(pedidos_total[1h]))" }]
+        },
+        {
+          "id": 8,
+          "title": "Logs Loki — Pedidos recientes",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 14 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "options": { "showTime": true, "wrapLogMessage": true },
+          "targets": [{
+            "expr": "{namespace=\"micrositio\", app=\"api\"} | json"
+          }]
+        }
+      ]
+    }
