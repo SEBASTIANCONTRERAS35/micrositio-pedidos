@@ -13,8 +13,8 @@ COPY package.json package-lock.json ./
 COPY api/package.json ./api/
 COPY worker/package.json ./worker/
 
-# Instalar SOLO deps del workspace api (sin dev)
-RUN npm ci --omit=dev -w api --include-workspace-root
+# Instalar SOLO deps del workspace api (sin dev, sin scripts husky/prepare)
+RUN npm ci --omit=dev --ignore-scripts -w api --include-workspace-root
 
 # Copiar el código de api
 COPY api ./api
@@ -25,7 +25,7 @@ WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY api/package.json ./api/
 COPY worker/package.json ./worker/
-RUN npm install -w api
+RUN npm install --ignore-scripts -w api
 COPY api ./api
 WORKDIR /repo/api
 EXPOSE 3000
