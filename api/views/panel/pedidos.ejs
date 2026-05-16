@@ -172,14 +172,14 @@
             <div class="pedido-detalle__actions">
               <button
                 x-show="selected.estado === 'pendiente'"
-                @click="confirmar(selected._id)"
+                @click="confirmar(selected.pedidoId)"
                 class="btn-confirmar"
               >
                 ✓ Confirmar pedido
               </button>
               <button
                 x-show="['pendiente', 'confirmado'].includes(selected.estado)"
-                @click="cancelar(selected._id)"
+                @click="cancelar(selected.pedidoId)"
                 class="btn-cancelar"
               >
                 Cancelar
