@@ -91,26 +91,40 @@ function panelPedidos() {
     openDetalle(pedido) {
       this.selected = pedido;
     },
-    async confirmar(id) {
+    async _accion(id, accion, mensaje) {
       const token = localStorage.getItem('panel_token');
-      await fetch('/api/pedidos/' + id + '/confirmar', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + token },
-      });
-      await this.loadPedidos();
-      this.selected = null;
+      try {
+        const res = await fetch('/api/pedidos/' + id + '/' + accion, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token },
+        });
+        if (!res.ok) {
+          let detalle = res.status + '';
+          try {
+            const body = await res.json();
+            detalle = body.message || body.error || detalle;
+          } catch (_) {}
+          alert('No se pudo ' + accion + ' el pedido: ' + detalle);
+          return;
+        }
+        await this.loadPedidos();
+        this.selected = null;
+        if (mensaje) {
+          // pequeno feedback no bloqueante
+          console.info(mensaje);
+        }
+      } catch (e) {
+        alert('Error de red al ' + accion + ' el pedido: ' + e.message);
+      }
+    },
+    async confirmar(id) {
+      await this._accion(id, 'confirmar', 'Pedido confirmado');
     },
     async cancelar(id) {
       if (!confirm('Cancelar este pedido? El stock se devolvera.')) {
         return;
       }
-      const token = localStorage.getItem('panel_token');
-      await fetch('/api/pedidos/' + id + '/cancelar', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + token },
-      });
-      await this.loadPedidos();
-      this.selected = null;
+      await this._accion(id, 'cancelar', 'Pedido cancelado');
     },
     logout() {
       localStorage.removeItem('panel_token');
