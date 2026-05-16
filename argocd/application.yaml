@@ -13,7 +13,7 @@ spec:
     path: k8s
     directory:
       recurse: true
-      exclude: '{**/*.example.yaml,kind-cluster.yaml,rollouts/*}' # No aplicar templates, kind config, ni rollouts (los activamos en K6.8)
+      exclude: '{**/*.example.yaml,kind-cluster.yaml}' # No aplicar templates, kind config, ni rollouts (los activamos en K6.8)
   destination:
     server: https://kubernetes.default.svc
     namespace: micrositio
