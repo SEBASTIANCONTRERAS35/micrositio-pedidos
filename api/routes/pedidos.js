@@ -26,7 +26,15 @@ const PedidoSchema = z.object({
   productos: z
     .array(
       z.object({
-        id: z.string().regex(/^[a-f0-9]{24}$/i, 'ID de producto invalido'),
+        // Acepta ObjectId hex (mock: 24 chars [a-f0-9]) Y SKU de ZUYU
+        // (e.g. "AVI-250") — mismo patron que usa publicApi de ZUYU
+        // (publicApi/shared/validation/schemas.js).
+        id: z
+          .string()
+          .trim()
+          .min(1)
+          .max(64)
+          .regex(/^[\w-]+$/, 'ID de producto invalido'),
         cantidad: z.number().int().positive().max(99),
       })
     )
