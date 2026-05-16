@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pedidos — <%= negocio.nombre %></title>
     <link rel="stylesheet" href="/css/panel.css" />
+    <script defer src="/js/panel-pedidos.js"></script>
     <script defer src="/js/alpine.min.js"></script>
   </head>
   <body x-data="panelPedidos" x-init="loadPedidos(); setInterval(loadPedidos, 30000)">
@@ -189,7 +190,5 @@
         </template>
       </div>
     </div>
-
-    <script defer src="/js/panel-pedidos.js"></script>
   </body>
 </html>
