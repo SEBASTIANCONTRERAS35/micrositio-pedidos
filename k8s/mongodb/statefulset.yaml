@@ -48,7 +48,7 @@ spec:
               chmod 400 /etc/mongodb/keyfile
               chown 999:999 /etc/mongodb/keyfile
           securityContext:
-            runAsUser: 0  # Necesita root para chown
+            runAsUser: 0 # Necesita root para chown
             runAsNonRoot: false
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -112,7 +112,9 @@ spec:
                 - --eval
                 - "db.adminCommand('ping').ok || quit(1)"
             initialDelaySeconds: 10
-            periodSeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 5
           startupProbe:
             exec:
               command:
@@ -120,12 +122,13 @@ spec:
                 - --quiet
                 - --eval
                 - "db.adminCommand('ping').ok || quit(1)"
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 10
             failureThreshold: 30
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false  # MongoDB necesita escribir en /data/db
+            readOnlyRootFilesystem: false # MongoDB necesita escribir en /data/db
             runAsNonRoot: true
             runAsUser: 999
             capabilities:
