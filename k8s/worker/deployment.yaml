@@ -7,7 +7,7 @@ metadata:
     app: worker
     component: backend
 spec:
-  replicas: 1  # KEDA escala desde 1 hasta 5 segun cola Redis
+  replicas: 1 # KEDA escala desde 1 hasta 5 segun cola Redis
   strategy:
     type: RollingUpdate
   selector:
@@ -21,7 +21,7 @@ spec:
     spec:
       serviceAccountName: worker-sa
       automountServiceAccountToken: false
-      terminationGracePeriodSeconds: 60  # mas tiempo para terminar jobs en curso
+      terminationGracePeriodSeconds: 60 # mas tiempo para terminar jobs en curso
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -31,11 +31,11 @@ spec:
           type: RuntimeDefault
       containers:
         - name: worker
-          image: SEBASTIANCONTRERAS35/micrositio-worker:latest
+          image: 10.211.55.30:30500/micrositio-worker:latest
           imagePullPolicy: Always
           envFrom:
             - secretRef:
-                name: api-env  # mismo secret que el API (comparten Redis y Mongo)
+                name: api-env # mismo secret que el API (comparten Redis y Mongo)
           env:
             - name: NODE_ENV
               value: production
@@ -52,7 +52,7 @@ spec:
           # En su lugar usamos exec probe que verifica conexion Redis
           livenessProbe:
             exec:
-              command: ["sh", "-c", "ps aux | grep -v grep | grep -q 'node index.js' || exit 1"]
+              command: ['sh', '-c', "ps aux | grep -v grep | grep -q 'node index.js' || exit 1"]
             initialDelaySeconds: 30
             periodSeconds: 30
           securityContext:

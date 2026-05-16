@@ -36,7 +36,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: api
-          image: SEBASTIANCONTRERAS35/micrositio-api:latest  # ArgoCD lo actualiza
+          image: 10.211.55.30:30500/micrositio-api:latest # ArgoCD lo actualiza
           imagePullPolicy: Always
           ports:
             - name: http
@@ -48,7 +48,7 @@ spec:
             - name: NODE_ENV
               value: production
             - name: PORT
-              value: "3000"
+              value: '3000'
             - name: LOG_LEVEL
               value: info
           resources:
