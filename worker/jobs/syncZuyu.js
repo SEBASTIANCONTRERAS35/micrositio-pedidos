@@ -112,14 +112,33 @@ module.exports = async (job, logger) => {
       );
       break;
 
-    case 'pedido_confirmado':
-      // ZUYU confirma que registro el pedido como Venta. Solo logueamos —
-      // el pedido local ya existe (lo creo el micrositio).
+    case 'pedido_confirmado': {
+      // ZUYU confirma el pedido como Venta. Enlazamos el Pedido local con
+      // el zuyuVentaId/idVenta para que el panel del dueno pueda mostrar
+      // el folio fiscal y para correlacionar reportes.
+      const Pedido =
+        mongoose.models.Pedido ||
+        mongoose.model('Pedido', new mongoose.Schema({}, { strict: false, collection: 'pedidos' }));
+      const ref = payload?.referenciaExterna;
+      if (ref) {
+        await Pedido.updateOne(
+          { referenciaExterna: ref, negocioId: negocio._id },
+          {
+            $set: {
+              zuyuVentaId: payload.zuyuVentaId || null,
+              zuyuIdVenta: payload.idVenta || null,
+              estadoZuyu: payload.estado || 'confirmado',
+              zuyuConfirmadoEn: new Date(),
+            },
+          }
+        );
+      }
       logger.info(
-        { referenciaExterna: payload?.referenciaExterna, idVenta: payload?.idVenta },
-        'ZUYU confirmo el pedido'
+        { referenciaExterna: ref, idVenta: payload?.idVenta },
+        'ZUYU confirmo el pedido — enlace zuyuVentaId/idVenta guardado'
       );
       break;
+    }
 
     default:
       logger.warn({ event }, 'Evento desconocido de ZUYU');
