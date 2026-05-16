@@ -31,10 +31,10 @@ RUNNING=$(kubectl get pods -n micrositio --no-headers | grep -c "Running")
 echo ""
 echo "── 4. MongoDB Replica Set ──"
 ROOT_PASS=$(kubectl get secret mongodb-users -n micrositio -o jsonpath='{.data.MONGO_INITDB_ROOT_PASSWORD}' | base64 -d 2>/dev/null)
-RS=$(kubectl exec mongodb-0 -n micrositio -c mongodb -- mongosh --quiet -u root -p "$ROOT_PASS" --authenticationDatabase admin --eval 'rs.status().members.length' 2>/dev/null)
-[ "$RS" = "3" ] && ok "3 miembros en Replica Set" || fail "Solo $RS miembros en RS"
+RS=$(kubectl exec mongodb-0 -n micrositio -c mongodb -- mongosh --quiet -u root -p "$ROOT_PASS" --authenticationDatabase admin --eval 'rs.status().members.length' 2>/dev/null | tr -dc '0-9')
+[ "$RS" = "3" ] && ok "3 miembros en Replica Set" || fail "Solo '$RS' miembros en RS"
 
-PRIMARY=$(kubectl exec mongodb-0 -n micrositio -c mongodb -- mongosh --quiet -u root -p "$ROOT_PASS" --authenticationDatabase admin --eval 'rs.status().members.filter(m=>m.stateStr=="PRIMARY").length' 2>/dev/null)
+PRIMARY=$(kubectl exec mongodb-0 -n micrositio -c mongodb -- mongosh --quiet -u root -p "$ROOT_PASS" --authenticationDatabase admin --eval 'rs.status().members.filter(m=>m.stateStr=="PRIMARY").length' 2>/dev/null | tr -dc '0-9')
 [ "$PRIMARY" = "1" ] && ok "1 PRIMARY elegido" || fail "Sin PRIMARY (rs.status fallido)"
 
 echo ""
