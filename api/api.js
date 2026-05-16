@@ -27,6 +27,7 @@ const mongoose = require('mongoose');
 
 const helmetMw = require('./middlewares/helmet');
 const errorHandler = require('./middlewares/errorHandler');
+const metricsMw = require('./middlewares/metrics');
 const logger = require('./utils/logger');
 
 const healthRoutes = require('./routes/health');
@@ -58,6 +59,7 @@ app.use(
 );
 app.use(compression());
 app.use(pinoHttp({ logger }));
+app.use(metricsMw.middleware);
 
 // ── Body parsers (excluir webhooks que necesitan raw) ──
 app.use((req, res, next) => {
@@ -81,6 +83,9 @@ app.use(hpp());
 const staticMaxAge = process.env.NODE_ENV === 'production' ? '1d' : 0;
 app.use('/css', express.static(path.join(__dirname, 'public/css'), { maxAge: staticMaxAge }));
 app.use('/js', express.static(path.join(__dirname, 'public/js'), { maxAge: staticMaxAge }));
+
+// ── Metrics endpoint (Prometheus scraping) ──
+app.get('/metrics', metricsMw.handler);
 
 // ── Routes ──
 app.use('/health', healthRoutes);
