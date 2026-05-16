@@ -1,0 +1,51 @@
+# Config del cluster K8s local con kind (Kubernetes-IN-Docker).
+#
+# 3 nodos en contenedores Docker: 1 control-plane + 2 workers.
+# Es Kubernetes upstream certificado — todo lo que aqui funcione corre
+# igual en cualquier cluster real (GKE, EKS, on-prem).
+#
+# Crear:  kind create cluster --config k8s/kind-cluster.yaml --name micrositio
+# Borrar: kind delete cluster --name micrositio
+#
+# Decisiones:
+# - disableDefaultCNI: true  → instalamos Calico encima (kindnet no soporta
+#   NetworkPolicy completa, y Calico es lo que dice mi ADR).
+# - podSubnet 192.168.0.0/16 → default de Calico (matchea su manifest).
+# - extraPortMappings 80/443 en el control-plane → nginx-ingress accesible
+#   desde http://localhost y https://zuyu.local (con /etc/hosts).
+# - kubeProxyMode iptables → mas compat con NetworkPolicy demos.
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+name: micrositio
+networking:
+  disableDefaultCNI: true
+  podSubnet: '192.168.0.0/16'
+  serviceSubnet: '10.96.0.0/16'
+  kubeProxyMode: 'iptables'
+
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.31.0
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+
+  - role: worker
+    image: kindest/node:v1.31.0
+    labels:
+      workload: app
+
+  - role: worker
+    image: kindest/node:v1.31.0
+    labels:
+      workload: data

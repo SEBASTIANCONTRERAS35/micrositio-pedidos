@@ -9,12 +9,12 @@ metadata:
 spec:
   secretName: zuyu-local-tls
   issuerRef:
-    name: ca-issuer
+    name: zuyu-ca-issuer
     kind: ClusterIssuer
   commonName: zuyu.local
   dnsNames:
     - zuyu.local
-  duration: 8760h   # 1 ano
+  duration: 8760h # 1 ano
   renewBefore: 720h
 ---
 # ═══════════════════════════════════════════════════════════════════
@@ -26,11 +26,11 @@ metadata:
   name: micrositio
   namespace: micrositio
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
+    nginx.ingress.kubernetes.io/ssl-redirect: 'true'
+    nginx.ingress.kubernetes.io/force-ssl-redirect: 'true'
+    nginx.ingress.kubernetes.io/proxy-body-size: '1m'
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '30'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '30'
 spec:
   ingressClassName: nginx
   tls:

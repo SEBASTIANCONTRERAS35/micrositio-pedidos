@@ -13,7 +13,7 @@ spec:
     path: k8s
     directory:
       recurse: true
-      exclude: "**/*.example.yaml"  # No aplicar templates de ejemplo
+      exclude: '{**/*.example.yaml,kind-cluster.yaml,rollouts/*}' # No aplicar templates, kind config, ni rollouts (los activamos en K6.8)
   destination:
     server: https://kubernetes.default.svc
     namespace: micrositio
@@ -23,7 +23,7 @@ spec:
       selfHeal: true
       allowEmpty: false
     syncOptions:
-      - CreateNamespace=false  # Ya existe, lo creamos manualmente
+      - CreateNamespace=false # Ya existe, lo creamos manualmente
       - PrunePropagationPolicy=foreground
       - PruneLast=true
       - RespectIgnoreDifferences=true
@@ -37,8 +37,8 @@ spec:
     - group: argoproj.io
       kind: Rollout
       jsonPointers:
-        - /spec/replicas  # KEDA modifica este campo
+        - /spec/replicas # KEDA modifica este campo
     - group: bitnami.com
       kind: SealedSecret
       jsonPointers:
-        - /spec/encryptedData  # solo cambia cuando se rota
+        - /spec/encryptedData # solo cambia cuando se rota

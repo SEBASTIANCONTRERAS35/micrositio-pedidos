@@ -28,7 +28,7 @@ spec:
       analysis:
         templates:
           - templateName: api-error-rate
-        startingStep: 2  # empieza analisis al llegar al 50%
+        startingStep: 2 # empieza analisis al llegar al 50%
         args:
           - name: service-name
             value: api
@@ -49,7 +49,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: api
-          image: SEBASTIANCONTRERAS35/micrositio-api:latest
+          image: 10.211.55.30:30500/micrositio-api:latest
           imagePullPolicy: Always
           ports:
             - { name: http, containerPort: 3000 }
@@ -57,7 +57,7 @@ spec:
             - { secretRef: { name: api-env } }
           env:
             - { name: NODE_ENV, value: production }
-            - { name: PORT, value: "3000" }
+            - { name: PORT, value: '3000' }
           resources:
             requests: { cpu: 100m, memory: 256Mi }
             limits: { cpu: 500m, memory: 512Mi }
