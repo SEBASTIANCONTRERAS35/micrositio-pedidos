@@ -13,33 +13,42 @@ echo "[1] Abrir https://zuyu.local/tienda/demo en el browser"
 echo "    (asumiendo /etc/hosts ya tiene zuyu.local apuntando a un worker)"
 open "https://zuyu.local/tienda/demo" 2>/dev/null || echo "  (en Mac: open; en Linux: xdg-open; o pega la URL manualmente)"
 
-# ── Paso 2: crear pedido via API ──
+# ── Paso 2: obtener productos reales del negocio (ObjectIds) ──
 echo ""
-echo "[2] Crear pedido vía API (simula checkout del cliente):"
-PEDIDO_ID="PED-$(date +%y%m)-$(printf '%04d' $RANDOM)"
-echo "    pedidoId: $PEDIDO_ID"
+echo "[2a] Obtener catálogo de productos del negocio demo:"
+APP_PASS=$(kubectl get secret mongodb-users -n micrositio -o jsonpath='{.data.APP_PASSWORD}' | base64 -d)
+PROD_IDS=$(kubectl exec mongodb-0 -n micrositio -c mongodb -- mongosh --quiet \
+  -u app -p "$APP_PASS" --authenticationDatabase micrositio micrositio \
+  --eval 'db.productos.find({},{_id:1}).limit(2).toArray().map(p => p._id.toString()).join(" ")' 2>/dev/null | tail -1)
+PROD1=$(echo $PROD_IDS | awk '{print $1}')
+PROD2=$(echo $PROD_IDS | awk '{print $2}')
+echo "    Producto 1: $PROD1"
+echo "    Producto 2: $PROD2"
 
-curl -k --resolve zuyu.local:443:10.211.55.37 -s -X POST https://zuyu.local/api/pedidos \
+echo ""
+echo "[2b] Crear pedido vía API (simula checkout del cliente):"
+
+curl -ks --resolve zuyu.local:443:10.211.55.37 -X POST https://zuyu.local/api/pedidos \
   -H "Content-Type: application/json" \
-  -d '{
-    "negocioSlug": "demo",
-    "cliente": {
-      "nombre": "Juan Pérez (demo Daniel)",
-      "telefono": "+525555550100",
-      "email": "juan@example.com",
-      "direccion": "Av. Reforma 100, CDMX"
+  -d "{
+    \"negocioSlug\": \"demo\",
+    \"cliente\": {
+      \"nombre\": \"Juan Pérez (demo Daniel)\",
+      \"telefono\": \"+525555550100\",
+      \"email\": \"juan@example.com\",
+      \"direccion\": \"Av. Reforma 100, CDMX\"
     },
-    "productos": [
-      { "id": "PROD-001", "cantidad": 2 },
-      { "id": "PROD-002", "cantidad": 1 }
+    \"productos\": [
+      { \"id\": \"$PROD1\", \"cantidad\": 2 },
+      { \"id\": \"$PROD2\", \"cantidad\": 1 }
     ],
-    "metodoPago": "efectivo"
-  }' | python3 -m json.tool 2>&1 | head -15
+    \"metodoPago\": \"efectivo\"
+  }" | python3 -m json.tool 2>&1 | head -20
 
 # ── Paso 3: listar pedidos ──
 echo ""
 echo "[3] Listar pedidos recientes (vía panel del dueño):"
-curl -k --resolve zuyu.local:443:10.211.55.37 -s https://zuyu.local/api/pedidos | python3 -m json.tool 2>&1 | head -20
+curl -ks --resolve zuyu.local:443:10.211.55.37 https://zuyu.local/api/pedidos | python3 -m json.tool 2>&1 | head -20
 
 # ── Paso 4: ver el pedido en MongoDB ──
 echo ""
@@ -53,8 +62,8 @@ kubectl exec mongodb-0 -n micrositio -c mongodb -- mongosh --quiet \
 echo ""
 echo "[5] Worker debe haber procesado un job 'notificaciones':"
 REDIS_PASS=$(kubectl get secret redis-auth -n micrositio -o jsonpath='{.data.REDIS_PASSWORD}' | base64 -d)
-kubectl exec redis-0 -n micrositio -- redis-cli -a "$REDIS_PASS" LLEN bull:notificaciones:wait 2>/dev/null
-kubectl exec redis-0 -n micrositio -- redis-cli -a "$REDIS_PASS" KEYS "bull:*" 2>/dev/null | head -5
+kubectl exec deploy/redis -n micrositio -- redis-cli -a "$REDIS_PASS" --no-auth-warning LLEN bull:notificaciones:wait 2>/dev/null
+kubectl exec deploy/redis -n micrositio -- redis-cli -a "$REDIS_PASS" --no-auth-warning KEYS "bull:*" 2>/dev/null | head -5
 
 echo ""
 echo "═══ FIN DEMO 1 ═══"
