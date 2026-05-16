@@ -14,6 +14,7 @@ negocio.nombre.charAt(0).toUpperCase() : '?'; const categoriaNames = Object.keys
     />
     <meta name="theme-color" content="#0F172A" />
     <link rel="stylesheet" href="/css/tienda.css" />
+    <script defer src="/js/tienda.js"></script>
     <script defer src="/js/alpine.min.js"></script>
   </head>
   <body data-type="<%= negocio.tipo %>" x-data="cartStore('<%= negocio.slug %>')">
@@ -407,7 +408,5 @@ negocio.nombre.charAt(0).toUpperCase() : '?'; const categoriaNames = Object.keys
         <p class="ct-footer__powered">Pedidos en linea via micrositio</p>
       </div>
     </footer>
-
-    <script defer src="/js/tienda.js"></script>
   </body>
 </html>
