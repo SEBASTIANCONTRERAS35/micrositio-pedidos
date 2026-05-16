@@ -224,6 +224,17 @@ async function confirmarPedido(pedidoId, usuarioId, negocioId) {
  * Cancela un pedido (dueno) y devuelve el stock en una transaccion atomica.
  * negocioId del JWT: tenant isolation (evita IDOR entre negocios).
  */
+// Pedido viene de ZUYU si tiene zuyuVentaId (set por syncZuyu en
+// pedido_confirmado) O si algun product.id no es un ObjectId valido
+// (SKU de ZUYU como "AVI-250"). En cualquiera de los dos casos, el stock
+// vive en ZUYU — no debemos devolver stock en el Mongo local.
+function esPedidoZuyu(pedido) {
+  if (pedido.zuyuVentaId) {
+    return true;
+  }
+  return (pedido.productos || []).some((p) => !mongoose.Types.ObjectId.isValid(p.id));
+}
+
 async function cancelarPedido(pedidoId, usuarioId, negocioId) {
   const session = await mongoose.startSession();
   try {
@@ -237,7 +248,19 @@ async function cancelarPedido(pedidoId, usuarioId, negocioId) {
         throw new Error(`No se puede cancelar pedido ${pedido.estado}`);
       }
 
-      await productoRepo.devolverStock(pedido.productos, session);
+      if (esPedidoZuyu(pedido)) {
+        // ZUYU es source-of-truth del stock — no tocar Producto local.
+        // TODO: llamar endpoint de cancelacion de ZUYU cuando exista
+        // (publicApi/v1/orders no expone DELETE/cancel hoy). Por ahora
+        // solo marcamos local como cancelado; el dueno debe cancelar
+        // tambien en la app ZUYU si quiere revertir el stock real.
+        logger.info(
+          { pedidoId, zuyuVentaId: pedido.zuyuVentaId },
+          'Pedido de ZUYU — skip devolverStock local'
+        );
+      } else {
+        await productoRepo.devolverStock(pedido.productos, session);
+      }
 
       pedido.estado = ESTADOS.CANCELADO;
       pedido.historial.push({
@@ -248,7 +271,7 @@ async function cancelarPedido(pedidoId, usuarioId, negocioId) {
       pedidoCancelado = pedido;
     });
 
-    logger.info({ pedidoId }, 'Pedido cancelado y stock devuelto');
+    logger.info({ pedidoId }, 'Pedido cancelado');
     return pedidoCancelado;
   } finally {
     session.endSession();
