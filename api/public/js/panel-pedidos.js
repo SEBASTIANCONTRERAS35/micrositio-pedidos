@@ -72,8 +72,8 @@ function panelPedidos() {
       }
       try {
         const [pedidosRes, meRes] = await Promise.all([
-          fetch('/api/panel/pedidos', { headers: { Authorization: 'Bearer ' + token } }),
-          fetch('/api/panel/me', { headers: { Authorization: 'Bearer ' + token } }),
+          fetch('/panel/api/pedidos', { headers: { Authorization: 'Bearer ' + token } }),
+          fetch('/panel/api/me', { headers: { Authorization: 'Bearer ' + token } }),
         ]);
         if (pedidosRes.status === 401 || meRes.status === 401) {
           localStorage.removeItem('panel_token');
