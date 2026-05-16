@@ -16,7 +16,10 @@ const mongoose = require('mongoose');
 
 const productoSnapshotSchema = new mongoose.Schema(
   {
-    id: { type: mongoose.Schema.Types.ObjectId, required: true },
+    // String para soportar BOTH: ObjectId del Mongo local (mock mode) Y
+    // SKUs de ZUYU como 'AVI-250' (modo conectado). Antes era ObjectId
+    // estricto y rompia con productos del catalogo de ZUYU.
+    id: { type: String, required: true },
     nombre: { type: String, required: true },
     precioUnitario: { type: Number, required: true, min: 0 },
     cantidad: { type: Number, required: true, min: 1, max: 99 },
