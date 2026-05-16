@@ -1,0 +1,59 @@
+# ═══════════════════════════════════════════════════════════════════
+# Alertas Prometheus para micrositio (bonus +2 pts rubrica)
+# Loaded automatically by kube-prometheus-stack via release=kps label
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: micrositio-alerts
+  namespace: observability
+  labels:
+    release: kps
+    app.kubernetes.io/part-of: micrositio
+spec:
+  groups:
+    - name: micrositio.app
+      interval: 30s
+      rules:
+        # Cola BullMQ acumulándose → KEDA debería estar escalando worker
+        - alert: RedisQueueBacklog
+          expr: sum(redis_list_length{namespace="micrositio", key=~"bull:.+:wait"}) > 100
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Cola Redis acumulándose'
+            description: 'Cola BullMQ tiene más de 100 jobs pendientes por 2+ min — KEDA debería estar escalando worker'
+
+        # Error rate 5xx > 5% → posible regresión
+        - alert: HighErrorRate
+          expr: |
+            sum(rate(http_requests_total{namespace="micrositio", status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{namespace="micrositio"}[5m])) > 0.05
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: 'Error rate 5xx > 5%'
+            description: 'API tiene más de 5% de errores 5xx en los últimos 5min — considerar rollback'
+
+        # Pod en CrashLoopBackOff
+        - alert: PodCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total{namespace="micrositio"}[10m]) > 0.1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: 'Pod en CrashLoopBackOff'
+            description: 'Pod {{ $labels.pod }} en namespace micrositio tiene reinicios frecuentes'
+
+        # MongoDB Replica Set: algún miembro caído
+        - alert: MongoDBSecondaryDown
+          expr: mongodb_replset_member_health{namespace="micrositio"} == 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'MongoDB miembro RS caído'
+            description: 'El nodo {{ $labels.member }} del Replica Set rs0 está down'
