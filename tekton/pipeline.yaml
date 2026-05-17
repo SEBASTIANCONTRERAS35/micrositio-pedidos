@@ -1,33 +1,45 @@
+# Pipeline completo del micrositio — 7 tasks que cubren el lifecycle CI
+#
+# Flujo:
+#   1. clone           → checkout del repo
+#   2. trivy-fs        → escaneo de filesystem (CVEs en deps + Dockerfile)
+#   3. api-lint-test   → npm ci + lint + vitest
+#   4. api-build       → kaniko build + push imagen api con tag = short commit
+#   5. api-trivy-image → escaneo de la imagen resultante
+#   6. worker-build    → kaniko build + push imagen worker
+#   7. worker-trivy-image → escaneo de la imagen worker
+#
+# Aplicar:  kubectl apply -f tekton/tasks/*.yaml -f tekton/pipeline.yaml
+# Ejecutar: kubectl create -f tekton/pipelinerun-example.yaml
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: micrositio-build
-  namespace: tekton-pipelines
+  namespace: ci
 spec:
   params:
     - name: repo-url
-      default: "https://github.com/SEBASTIANCONTRERAS35/micrositio-pedidos.git"
+      default: 'https://github.com/SEBASTIANCONTRERAS35/micrositio-pedidos.git'
     - name: revision
-      default: "main"
+      default: 'main'
     - name: image-api
-      default: "docker.io/sebastiancontreras35/micrositio-api"
+      default: '10.211.55.30:30500/micrositio-api'
     - name: image-worker
-      default: "docker.io/sebastiancontreras35/micrositio-worker"
+      default: '10.211.55.30:30500/micrositio-worker'
   workspaces:
     - name: source
-    - name: dockerconfig
 
   tasks:
     # 1. Clone
     - name: clone
       taskRef: { name: git-clone }
       workspaces:
-        - { name: source, workspace: source }
+        - { name: output, workspace: source }
       params:
         - { name: url, value: $(params.repo-url) }
         - { name: revision, value: $(params.revision) }
 
-    # 2. Trivy scan filesystem (deps + Dockerfiles)
+    # 2. Trivy scan filesystem (vulnerabilidades en deps + Dockerfile)
     - name: trivy-fs
       runAfter: [clone]
       taskRef: { name: trivy-scan }
@@ -35,16 +47,16 @@ spec:
         - { name: source, workspace: source }
       params:
         - { name: target, value: fs }
-        - { name: "path-or-image", value: "." }
+        - { name: path-or-image, value: 'repo' }
 
     # 3. Lint + Tests del API
     - name: api-lint-test
       runAfter: [clone]
-      taskRef: { name: install-deps }  # Usamos install-deps que tambien corre tests si lo orquestamos asi
+      taskRef: { name: lint-test }
       workspaces:
         - { name: source, workspace: source }
       params:
-        - { name: workdir, value: api }
+        - { name: workdir, value: 'repo/api' }
 
     # 4. Build + push imagen API
     - name: api-build
@@ -52,10 +64,10 @@ spec:
       taskRef: { name: kaniko-build }
       workspaces:
         - { name: source, workspace: source }
-        - { name: dockerconfig, workspace: dockerconfig }
       params:
-        - { name: context-dir, value: api }
-        - { name: image, value: "$(params.image-api):$(tasks.clone.results.commit-short)" }
+        - { name: image, value: '$(params.image-api):latest' }
+        - { name: dockerfile, value: 'api/Dockerfile' }
+        - { name: context, value: 'repo' }
         - { name: target, value: production }
 
     # 5. Trivy scan de la imagen API construida
@@ -66,7 +78,7 @@ spec:
         - { name: source, workspace: source }
       params:
         - { name: target, value: image }
-        - { name: "path-or-image", value: "$(params.image-api):$(tasks.clone.results.commit-short)" }
+        - { name: path-or-image, value: '$(params.image-api):latest' }
 
     # 6. Build + push imagen worker
     - name: worker-build
@@ -74,10 +86,10 @@ spec:
       taskRef: { name: kaniko-build }
       workspaces:
         - { name: source, workspace: source }
-        - { name: dockerconfig, workspace: dockerconfig }
       params:
-        - { name: context-dir, value: worker }
-        - { name: image, value: "$(params.image-worker):$(tasks.clone.results.commit-short)" }
+        - { name: image, value: '$(params.image-worker):latest' }
+        - { name: dockerfile, value: 'worker/Dockerfile' }
+        - { name: context, value: 'repo' }
         - { name: target, value: production }
 
     # 7. Trivy scan de la imagen worker
@@ -88,4 +100,4 @@ spec:
         - { name: source, workspace: source }
       params:
         - { name: target, value: image }
-        - { name: "path-or-image", value: "$(params.image-worker):$(tasks.clone.results.commit-short)" }
+        - { name: path-or-image, value: '$(params.image-worker):latest' }

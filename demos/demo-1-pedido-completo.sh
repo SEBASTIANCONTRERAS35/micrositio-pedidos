@@ -84,13 +84,19 @@ if (p.delivery) {
 }
 " 2>&1 | tail -5
 
-# ── PASO 8: simular webhook "entregado" ──
+# ── PASO 8: simular webhook "entregado" CON HMAC firmado ──
 echo ""
-echo "[7] Simular webhook de iVoy 'entregado' (POST /webhooks/delivery?provider=ivoy):"
-WEBHOOK_BODY="{\"deliveryId\":\"sim-${PEDIDO_ID}\",\"status\":\"delivered\",\"pedidoId\":\"$PEDIDO_ID\"}"
+echo "[7] Simular webhook de iVoy 'entregado' (con HMAC firmado SHA256):"
+WEBHOOK_SECRET=$(kubectl get secret api-env -n micrositio -o jsonpath='{.data.WEBHOOK_SECRET_IVOY}' | base64 -d)
+TIMESTAMP=$(date +%s)
+WEBHOOK_BODY="{\"orderId\":\"sim-${PEDIDO_ID}\",\"status\":\"delivered\",\"pedidoId\":\"$PEDIDO_ID\",\"timestamp\":$TIMESTAMP}"
+SIG=$(printf '%s' "$WEBHOOK_BODY" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" -hex | awk '{print $NF}')
+echo "    Signature: sha256=${SIG:0:16}..."
 curl -ks --resolve zuyu.local:443:10.211.55.37 \
   -X POST "https://zuyu.local/webhooks/delivery?provider=ivoy" \
   -H "Content-Type: application/json" \
+  -H "x-ivoy-signature: sha256=$SIG" \
+  -H "x-ivoy-timestamp: $TIMESTAMP" \
   -d "$WEBHOOK_BODY" \
   -w "    HTTP %{http_code}\n" -o /dev/null
 
