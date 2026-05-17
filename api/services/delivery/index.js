@@ -18,6 +18,28 @@ function getProvider(name) {
 }
 
 /**
+ * Selecciona el carrier óptimo según la ciudad del negocio (bonus multi-carrier).
+ * Reglas:
+ *   - CDMX / EdoMex        → iVoy (cobertura local, tarifa baja)
+ *   - Guadalajara/Monterrey → Lalamove (mejor cobertura ZMM)
+ *   - Otras (nacional)     → Uber Direct (68 ciudades)
+ * Si el negocio tiene `deliveryProvider` explícito en BD, ese gana (override).
+ */
+function selectProviderByCity(negocio) {
+  if (negocio?.deliveryProvider) {
+    return negocio.deliveryProvider;
+  }
+  const ciudad = (negocio?.direccion?.ciudad || '').toLowerCase();
+  if (ciudad.includes('cdmx') || ciudad.includes('mexico') || ciudad.includes('méxico')) {
+    return 'ivoy';
+  }
+  if (ciudad.includes('guadalajara') || ciudad.includes('monterrey')) {
+    return 'lalamove';
+  }
+  return 'uberDirect';
+}
+
+/**
  * Solicita un repartidor al carrier indicado
  * @param {string} providerName - 'ivoy' | 'lalamove' | 'uberDirect'
  * @param {object} pedido - documento del pedido
@@ -57,4 +79,5 @@ module.exports = {
   cancelDelivery,
   verifyWebhook,
   parseWebhook,
+  selectProviderByCity,
 };
