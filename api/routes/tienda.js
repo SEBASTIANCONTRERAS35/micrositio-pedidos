@@ -5,8 +5,10 @@
  * GET /tienda/:slug/pedido/:pedidoId — confirmacion del pedido
  */
 const express = require('express');
+const mongoose = require('mongoose');
 const Negocio = require('../models/negocio');
 const Pedido = require('../models/pedido');
+const Producto = require('../models/producto');
 const { tiendaCache } = require('../services/cache');
 const zuyu = require('../services/zuyu');
 
@@ -32,6 +34,30 @@ router.get('/:slug', async (req, res) => {
   // Cache largo (1 hora). ZUYU manda webhook para invalidar antes si hay cambios.
   tiendaCache.set(slug, catalogo, 60 * 60 * 1000);
   res.render('tienda/index', catalogo);
+});
+
+// Detalle de un producto del catálogo
+router.get('/:slug/producto/:productoId', async (req, res) => {
+  const { slug, productoId } = req.params;
+  const negocio = await Negocio.findOne({ slug, activo: true }).lean();
+  if (!negocio) {
+    return res.status(404).render('tienda/404', { mensaje: 'Negocio no encontrado' });
+  }
+  if (!mongoose.Types.ObjectId.isValid(productoId)) {
+    return res.status(404).render('tienda/404', { mensaje: 'Producto no válido' });
+  }
+  const producto = await Producto.findOne({
+    _id: productoId,
+    negocioId: negocio._id,
+    activo: true,
+  }).lean();
+  if (!producto) {
+    return res.status(404).render('tienda/404', { mensaje: 'Producto no encontrado' });
+  }
+  res.render('tienda/producto', {
+    negocio: { ...negocio, slug },
+    producto,
+  });
 });
 
 router.get('/:slug/checkout', async (req, res) => {
