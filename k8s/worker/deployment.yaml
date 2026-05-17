@@ -33,6 +33,10 @@ spec:
         - name: worker
           image: 10.211.55.30:30500/micrositio-worker:latest
           imagePullPolicy: Always
+          ports:
+            - name: metrics
+              containerPort: 3001
+              protocol: TCP
           envFrom:
             - secretRef:
                 name: api-env # mismo secret que el API (comparten Redis y Mongo)
@@ -41,6 +45,8 @@ spec:
               value: production
             - name: LOG_LEVEL
               value: info
+            - name: METRICS_PORT
+              value: '3001'
           resources:
             requests:
               cpu: 50m
