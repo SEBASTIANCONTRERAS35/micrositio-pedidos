@@ -219,7 +219,15 @@ negocio.nombre.charAt(0).toUpperCase() : '?'; const categoriaNames = Object.keys
                 <% } %>
               </div>
               <div class="ct-card__body">
-                <p class="ct-card__name"><%= prod.nombre %></p>
+                <p class="ct-card__name">
+                  <a
+                    href="/tienda/<%= negocio.slug %>/producto/<%= prod._id %>"
+                    style="color: inherit; text-decoration: none"
+                    title="Ver detalle de <%= prod.nombre %>"
+                  >
+                    <%= prod.nombre %>
+                  </a>
+                </p>
                 <div class="ct-card__footer">
                   <span class="ct-card__price">$<%= prod.precio.toFixed(2) %></span>
                   <% if (!agotado) { %>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= producto.nombre %> — <%= negocio.nombre %></title>
+    <meta name="description" content="<%= producto.nombre %> en <%= negocio.nombre %>" />
+    <link rel="stylesheet" href="/css/tienda.css" />
+    <script defer src="/js/alpine.min.js"></script>
+  </head>
+  <body x-data="{ cantidad: 1 }">
+    <header class="ct-header">
+      <div class="ct-header__inner">
+        <a
+          href="/tienda/<%= negocio.slug %>"
+          class="ct-header__back"
+          aria-label="Volver al catálogo"
+        >
+          ← Volver al catálogo
+        </a>
+        <h1 class="ct-header__name"><%= negocio.nombre %></h1>
+      </div>
+    </header>
+
+    <main class="ct-producto-detalle" style="max-width: 720px; margin: 32px auto; padding: 0 16px">
+      <article
+        style="
+          background: #fff;
+          border-radius: 12px;
+          padding: 24px;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        "
+      >
+        <% if (producto.imagen) { %>
+        <img
+          src="<%= producto.imagen %>"
+          alt="<%= producto.nombre %>"
+          style="
+            width: 100%;
+            max-height: 320px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 16px;
+          "
+        />
+        <% } else { %>
+        <div
+          style="
+            width: 100%;
+            height: 200px;
+            background: #f0f4f8;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 64px;
+            color: #94a3b8;
+            margin-bottom: 16px;
+          "
+        >
+          🛍️
+        </div>
+        <% } %>
+
+        <span
+          style="
+            display: inline-block;
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 8px;
+          "
+        >
+          <%= producto.categoria || 'General' %>
+        </span>
+
+        <h2 style="margin: 8px 0; font-size: 28px; color: #0f172a"><%= producto.nombre %></h2>
+
+        <% if (producto.descripcion) { %>
+        <p style="color: #475569; line-height: 1.5; margin: 16px 0"><%= producto.descripcion %></p>
+        <% } %>
+
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 24px 0;
+            padding: 16px 0;
+            border-top: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+          "
+        >
+          <div>
+            <p style="margin: 0; font-size: 14px; color: #64748b">Precio</p>
+            <p style="margin: 4px 0 0; font-size: 32px; font-weight: 700; color: #0f172a">
+              $<%= producto.precio.toFixed(2) %>
+              <span style="font-size: 14px; font-weight: 400; color: #64748b">MXN</span>
+            </p>
+          </div>
+          <div style="text-align: right">
+            <p style="margin: 0; font-size: 14px; color: #64748b">Disponible</p>
+            <p
+              style="margin:4px 0 0;font-size:18px;font-weight:600;color:<%= producto.stock > 5 ? '#16a34a' : (producto.stock > 0 ? '#ea580c' : '#dc2626') %>;"
+            >
+              <%= producto.stock %> unidades
+            </p>
+          </div>
+        </div>
+
+        <% if (producto.stock > 0) { %>
+        <div style="display: flex; gap: 12px; align-items: center">
+          <label for="qty" style="font-weight: 600">Cantidad:</label>
+          <input
+            id="qty"
+            type="number"
+            x-model.number="cantidad"
+            min="1"
+            :max="<%= producto.stock %>"
+            value="1"
+            style="
+              width: 80px;
+              padding: 8px;
+              border: 1px solid #cbd5e1;
+              border-radius: 8px;
+              font-size: 16px;
+            "
+          />
+          <a
+            href="/tienda/<%= negocio.slug %>"
+            style="
+              margin-left: auto;
+              background: #3b82f6;
+              color: #fff;
+              padding: 12px 24px;
+              border-radius: 8px;
+              text-decoration: none;
+              font-weight: 600;
+            "
+          >
+            Agregar al carrito y continuar
+          </a>
+        </div>
+        <% } else { %>
+        <p
+          style="
+            text-align: center;
+            color: #dc2626;
+            font-weight: 600;
+            padding: 16px;
+            background: #fef2f2;
+            border-radius: 8px;
+          "
+        >
+          ⚠️ Producto agotado temporalmente
+        </p>
+        <% } %>
+      </article>
+
+      <p style="text-align: center; margin-top: 16px; color: #64748b; font-size: 13px">
+        Compra segura · Entrega a domicilio en <%= negocio.direccion && negocio.direccion.ciudad ?
+        negocio.direccion.ciudad : 'tu zona' %>
+      </p>
+    </main>
+  </body>
+</html>
