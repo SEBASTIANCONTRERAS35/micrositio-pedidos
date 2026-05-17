@@ -1,0 +1,132 @@
+# ═══════════════════════════════════════════════════════════════════
+# Job de inicialización del MongoDB Replica Set + creación de usuarios.
+#
+# Pasos:
+#   1. Espera a que mongodb-0/1/2 estén alcanzables
+#   2. rs.initiate() (idempotente — si ya existe, skip)
+#   3. Espera elección de PRIMARY
+#   4. Crea usuarios root/app/worker via localhost exception (mongo-0)
+#   5. Idempotente: re-correr no rompe nada
+# ═══════════════════════════════════════════════════════════════════
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mongodb-init
+  namespace: micrositio
+  labels: { app: mongodb-init }
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: mongo-init
+          image: mongo:7.0.14
+          env:
+            - {
+                name: MONGO_ROOT_USER,
+                valueFrom:
+                  { secretKeyRef: { name: mongodb-users, key: MONGO_INITDB_ROOT_USERNAME } },
+              }
+            - {
+                name: MONGO_ROOT_PASS,
+                valueFrom:
+                  { secretKeyRef: { name: mongodb-users, key: MONGO_INITDB_ROOT_PASSWORD } },
+              }
+            - {
+                name: APP_USER,
+                valueFrom: { secretKeyRef: { name: mongodb-users, key: APP_USER } },
+              }
+            - {
+                name: APP_PASS,
+                valueFrom: { secretKeyRef: { name: mongodb-users, key: APP_PASSWORD } },
+              }
+            - {
+                name: WORKER_USER,
+                valueFrom: { secretKeyRef: { name: mongodb-users, key: WORKER_USER } },
+              }
+            - {
+                name: WORKER_PASS,
+                valueFrom: { secretKeyRef: { name: mongodb-users, key: WORKER_PASSWORD } },
+              }
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              NS=micrositio
+              M0="mongodb-0.mongodb-headless.${NS}.svc.cluster.local"
+              M1="mongodb-1.mongodb-headless.${NS}.svc.cluster.local"
+              M2="mongodb-2.mongodb-headless.${NS}.svc.cluster.local"
+
+              echo "[init] Esperando que mongodb-0 acepte conexiones..."
+              until mongosh --host "$M0" --quiet --eval 'db.adminCommand({ping:1}).ok' >/dev/null 2>&1 ; do
+                sleep 3
+              done
+              echo "[init] mongodb-0 alcanzable"
+
+              echo "[init] rs.initiate() (idempotente)..."
+              mongosh --host "$M0" --quiet <<EOF
+              try {
+                rs.status();
+                print('[init] Replica Set YA inicializado');
+              } catch (e) {
+                rs.initiate({
+                  _id: 'rs0',
+                  members: [
+                    { _id: 0, host: '${M0}:27017', priority: 2 },
+                    { _id: 1, host: '${M1}:27017', priority: 1 },
+                    { _id: 2, host: '${M2}:27017', priority: 1 }
+                  ]
+                });
+                print('[init] Replica Set INICIADO');
+              }
+              EOF
+
+              echo "[init] Esperando elección de PRIMARY..."
+              for i in $(seq 1 60); do
+                STATE=$(mongosh --host "$M0" --quiet --eval 'try { rs.status().myState } catch(e) {""}' 2>/dev/null | tail -1 | tr -d '[:space:]')
+                if [ "$STATE" = "1" ] || [ "$STATE" = "2" ]; then
+                  echo "[init] mongodb-0 state=$STATE (1=PRIMARY, 2=SECONDARY)"
+                  break
+                fi
+                sleep 2
+              done
+
+              echo "[init] Crear usuarios (idempotente, vía localhost exception O auth root)..."
+              # Primero intentamos crear root vía localhost exception (sin auth)
+              # Si falla porque ya existe, intentamos con auth
+              mongosh --host "$M0" --quiet <<EOF || true
+              db = db.getSiblingDB('admin');
+              try {
+                db.createUser({user: '${MONGO_ROOT_USER}', pwd: '${MONGO_ROOT_PASS}', roles: [{role: 'root', db: 'admin'}]});
+                print('[init] Root user CREADO');
+              } catch (e) {
+                print('[init] Root user ya existe o falló (esperado si ya existe)');
+              }
+              EOF
+
+              # Después usuarios app/worker (require auth de root)
+              mongosh --host "$M0" --quiet \
+                -u "${MONGO_ROOT_USER}" -p "${MONGO_ROOT_PASS}" \
+                --authenticationDatabase admin <<EOF
+              db = db.getSiblingDB('micrositio');
+              try {
+                db.createUser({user: '${APP_USER}', pwd: '${APP_PASS}',
+                  roles: [{role: 'readWrite', db: 'micrositio'}, {role: 'dbAdmin', db: 'micrositio'}]});
+                print('[init] App user CREADO');
+              } catch (e) { print('[init] App user ya existe'); }
+              try {
+                db.createUser({user: '${WORKER_USER}', pwd: '${WORKER_PASS}',
+                  roles: [{role: 'readWrite', db: 'micrositio'}]});
+                print('[init] Worker user CREADO');
+              } catch (e) { print('[init] Worker user ya existe'); }
+              print('[init] Usuarios en micrositio: ' + db.getUsers().users.map(u => u.user).join(', '));
+              EOF
+
+              echo "[init] DONE"

@@ -16,6 +16,7 @@ const deliveryJob = require('./jobs/delivery');
 const notificacionesJob = require('./jobs/notificaciones');
 const webhookJob = require('./jobs/webhookDelivery');
 const syncZuyuJob = require('./jobs/syncZuyu');
+const { instrumentWorker, startMetricsServer } = require('./metrics');
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
@@ -110,8 +111,9 @@ async function start() {
     )
   );
 
-  // Logs y manejo de errores
+  // Logs + Prometheus metrics
   workers.forEach((worker) => {
+    instrumentWorker(worker); // counters/histograms/gauges para Prom
     worker.on('completed', (job) => {
       logger.info({ jobId: job.id, queue: job.queueName }, 'Job completado');
     });
@@ -123,7 +125,10 @@ async function start() {
     });
   });
 
-  logger.info(`Worker iniciado con ${workers.length} colas`);
+  // HTTP server :3001 para Prometheus scraping
+  startMetricsServer(parseInt(process.env.METRICS_PORT || '3001', 10));
+
+  logger.info(`Worker iniciado con ${workers.length} colas + metrics en :3001`);
 }
 
 async function shutdown() {
