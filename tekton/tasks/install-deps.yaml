@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: install-deps
-  namespace: tekton-pipelines
+  namespace: ci
 spec:
   params:
     - name: workdir

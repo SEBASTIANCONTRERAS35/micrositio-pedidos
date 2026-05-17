@@ -2,14 +2,14 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: trivy-scan
-  namespace: tekton-pipelines
+  namespace: ci
 spec:
   params:
     - name: target
-      description: "fs (filesystem) o image"
+      description: 'fs (filesystem) o image'
       default: fs
     - name: path-or-image
-      description: "path para fs o image:tag para image"
+      description: 'path para fs o image:tag para image'
   workspaces:
     - name: source
   steps:
