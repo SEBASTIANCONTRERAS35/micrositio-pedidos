@@ -17,6 +17,9 @@ echo "[1] Crear/limpiar negocio demo + productos:"
 kubectl exec mongodb-0 -n micrositio -c mongodb -- mongosh --quiet \
   -u app -p "$APP_PASS" --authenticationDatabase micrositio micrositio --eval '
 const negSlug = "demo";
+// Limpiar productos de negocios demo anteriores (cada re-seed crea un
+// negocio con _id nuevo → sin esto los productos viejos quedan huérfanos).
+db.negocios.find({slug: negSlug}).toArray().forEach(n => db.productos.deleteMany({negocioId: n._id}));
 db.negocios.deleteMany({slug: negSlug});
 const negocio = db.negocios.insertOne({
   slug: negSlug,

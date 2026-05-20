@@ -19,10 +19,11 @@ open "https://zuyu.local/tienda/demo" 2>/dev/null || true
 curl -ks --resolve zuyu.local:443:10.211.55.37 https://zuyu.local/tienda/demo \
   -o /dev/null -w "  HTTP %{http_code} (catálogo) en %{time_total}s\n"
 
-# ── PASO 2: obtener productos ──
+# ── PASO 2: obtener productos DEL NEGOCIO demo ──
+# (find({}) sin filtro agarraría productos de otros negocios → POST 404)
 PROD_IDS=$(kubectl exec mongodb-0 -n micrositio -c mongodb -- mongosh --quiet \
   -u app -p "$APP_PASS" --authenticationDatabase micrositio micrositio \
-  --eval 'db.productos.find({},{_id:1}).limit(2).toArray().map(p => p._id.toString()).join(" ")' 2>/dev/null | tail -1)
+  --eval 'const n=db.negocios.findOne({slug:"demo"}); db.productos.find({negocioId:n._id},{_id:1}).limit(2).toArray().map(p => p._id.toString()).join(" ")' 2>/dev/null | tail -1)
 PROD1=$(echo $PROD_IDS | awk '{print $1}')
 PROD2=$(echo $PROD_IDS | awk '{print $2}')
 
@@ -87,9 +88,14 @@ if (p.delivery) {
 # ── PASO 8: simular webhook "entregado" CON HMAC firmado ──
 echo ""
 echo "[7] Simular webhook de iVoy 'entregado' (con HMAC firmado SHA256):"
+# El webhook debe referenciar el deliveryId REAL asignado por el carrier:
+# webhookDelivery.js busca el pedido por delivery.deliveryId (no por uno inventado).
+DELIVERY_ID=$(kubectl exec mongodb-0 -n micrositio -c mongodb -- mongosh --quiet \
+  -u app -p "$APP_PASS" --authenticationDatabase micrositio micrositio \
+  --eval "const p=db.pedidos.findOne({pedidoId:'$PEDIDO_ID'}); print(p && p.delivery ? p.delivery.deliveryId : '')" 2>/dev/null | tail -1 | tr -d '[:space:]')
 WEBHOOK_SECRET=$(kubectl get secret api-env -n micrositio -o jsonpath='{.data.WEBHOOK_SECRET_IVOY}' | base64 -d)
 TIMESTAMP=$(date +%s)
-WEBHOOK_BODY="{\"orderId\":\"sim-${PEDIDO_ID}\",\"status\":\"delivered\",\"pedidoId\":\"$PEDIDO_ID\",\"timestamp\":$TIMESTAMP}"
+WEBHOOK_BODY="{\"orderId\":\"$DELIVERY_ID\",\"status\":\"delivered\",\"pedidoId\":\"$PEDIDO_ID\",\"timestamp\":$TIMESTAMP}"
 SIG=$(printf '%s' "$WEBHOOK_BODY" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" -hex | awk '{print $NF}')
 echo "    Signature: sha256=${SIG:0:16}..."
 curl -ks --resolve zuyu.local:443:10.211.55.37 \
