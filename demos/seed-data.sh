@@ -8,10 +8,9 @@ echo "═══ SEED DATA — datos demo para defensa ═══"
 ROOT_PASS=$(kubectl get secret mongodb-users -n micrositio -o jsonpath='{.data.MONGO_INITDB_ROOT_PASSWORD}' | base64 -d)
 APP_PASS=$(kubectl get secret mongodb-users -n micrositio -o jsonpath='{.data.APP_PASSWORD}' | base64 -d)
 
-# Argon2 hash de "Demo1234!" (pre-calculado — para no requerir node en el script)
-# Generado con: const a = require('argon2'); await a.hash('Demo1234!');
-# Para la demo NO es necesario hash real — la app valida con argon2 que rechazaría hash bogus.
-# Solución: generar el hash en vivo desde un pod api (que tiene argon2).
+# Hash Argon2 de "Demo1234!" pre-calculado (argon2id real). El salt va
+# embebido en el hash → es determinista y portable. NO se genera en vivo
+# porque la imagen del api no expone 'node' en el PATH del contenedor.
 
 echo ""
 echo "[1] Crear/limpiar negocio demo + productos:"
@@ -42,12 +41,10 @@ print("✓ Productos: " + db.productos.countDocuments({negocioId: negocio.insert
 ' 2>&1 | tail -8
 
 echo ""
-echo "[2] Generar hash Argon2 para password 'Demo1234!' desde pod api (real):"
-HASH=$(kubectl exec -n micrositio deploy/api -- node -e '
-const a = require("argon2");
-a.hash("Demo1234!").then(h => console.log(h)).catch(e => { console.error(e); process.exit(1); });
-' 2>/dev/null)
-echo "    Hash: ${HASH:0:60}..."
+echo "[2] Hash Argon2 de 'Demo1234!' (pre-calculado, argon2id real):"
+# Regenerar con: cd api && node -e 'require("argon2").hash("Demo1234!").then(console.log)'
+HASH='$argon2id$v=19$m=65536,t=3,p=4$QAK3nCNpvpPKBOAk1SiBsA$r0MkZsa4XMFhrT4K0s/ZtoN9yxM2mJXmrMmFit63P+4'
+echo "    Hash: ${HASH:0:30}..."
 
 echo ""
 echo "[3] Crear usuario dueño:"
