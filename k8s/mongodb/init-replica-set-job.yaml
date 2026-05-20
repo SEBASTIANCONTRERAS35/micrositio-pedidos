@@ -11,7 +11,9 @@
 # ArgoCD PreSync hook: corre ANTES de aplicar el resto de manifiestos.
 # En deploy inicial las NetworkPolicies aún no existen → el Job conecta
 # libre. En re-syncs, la NetworkPolicy allow-mongodb-init lo deja pasar.
-# hook-delete-policy HookSucceeded → ArgoCD borra el Job al completar.
+# hook-delete-policy BeforeHookCreation → el Job viejo se borra justo
+# antes del siguiente sync (más robusto que HookSucceeded, que puede
+# dejar a ArgoCD esperando un hook ya borrado).
 # ═══════════════════════════════════════════════════════════════════
 apiVersion: batch/v1
 kind: Job
@@ -21,7 +23,7 @@ metadata:
   labels: { app: mongodb-init }
   annotations:
     argocd.argoproj.io/hook: PreSync
-    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 4
   template:
