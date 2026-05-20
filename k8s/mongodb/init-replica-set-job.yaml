@@ -7,6 +7,11 @@
 #   3. Espera elección de PRIMARY
 #   4. Crea usuarios root/app/worker via localhost exception (mongo-0)
 #   5. Idempotente: re-correr no rompe nada
+#
+# ArgoCD PreSync hook: corre ANTES de aplicar el resto de manifiestos.
+# En deploy inicial las NetworkPolicies aún no existen → el Job conecta
+# libre. En re-syncs, la NetworkPolicy allow-mongodb-init lo deja pasar.
+# hook-delete-policy HookSucceeded → ArgoCD borra el Job al completar.
 # ═══════════════════════════════════════════════════════════════════
 apiVersion: batch/v1
 kind: Job
@@ -14,9 +19,11 @@ metadata:
   name: mongodb-init
   namespace: micrositio
   labels: { app: mongodb-init }
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
 spec:
   backoffLimit: 4
-  ttlSecondsAfterFinished: 600
   template:
     spec:
       restartPolicy: OnFailure
