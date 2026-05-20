@@ -43,7 +43,9 @@ module.exports = async (job, logger) => {
 
   // Actualizar pedido
   pedido.delivery.estado = event.estado;
-  if (event.repartidor) pedido.delivery.repartidor = event.repartidor;
+  if (event.repartidor) {
+    pedido.delivery.repartidor = event.repartidor;
+  }
   pedido.delivery.actualizadoEn = new Date();
 
   const nuevoEstadoPedido = ESTADO_MAP[event.estado];

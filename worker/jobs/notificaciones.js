@@ -22,20 +22,28 @@ const twilioClient = process.env.TWILIO_ACCOUNT_SID
 module.exports = async (job, logger) => {
   const { pedidoId } = job.data;
   const pedido = await Pedido.findOne({ pedidoId }).lean();
-  if (!pedido) throw new Error(`Pedido ${pedidoId} no encontrado`);
+  if (!pedido) {
+    throw new Error(`Pedido ${pedidoId} no encontrado`);
+  }
 
   const subject = subjectFor(job.name, pedido);
   const html = htmlFor(job.name, pedido);
   const sms = smsFor(job.name, pedido);
 
-  await Promise.allSettled([sendEmail(pedido, subject, html, logger), sendWhatsApp(pedido, sms, logger)]);
+  await Promise.allSettled([
+    sendEmail(pedido, subject, html, logger),
+    sendWhatsApp(pedido, sms, logger),
+  ]);
 
   return { ok: true };
 };
 
 async function sendEmail(pedido, subject, html, logger) {
   if (!resend || !pedido.cliente?.email) {
-    logger.warn({ pedidoId: pedido.pedidoId }, 'Email no enviado (Resend no configurado o sin email)');
+    logger.warn(
+      { pedidoId: pedido.pedidoId },
+      'Email no enviado (Resend no configurado o sin email)'
+    );
     return;
   }
   try {
