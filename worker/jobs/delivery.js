@@ -44,11 +44,15 @@ module.exports = async (job, logger) => {
       costoEnvio: result.costoEnvio,
       actualizadoEn: new Date(),
     };
+    // Schema strict:false → Mongoose no detecta cambios en sub-objetos no
+    // declarados; sin markModified, save() los ignora silenciosamente.
+    pedido.markModified('delivery');
     pedido.historial = pedido.historial || [];
     pedido.historial.push({
       estado: 'repartidor_solicitado',
       nota: `Solicitado a ${proveedor}: ${result.deliveryId}`,
     });
+    pedido.markModified('historial');
     await pedido.save();
 
     // Notificar al cliente
