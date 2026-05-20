@@ -28,6 +28,14 @@ const ESTADO_MAP = {
 module.exports = async (job, logger) => {
   const { provider, event } = job.data;
 
+  // Sin deliveryId no se puede correlacionar el pedido — un
+  // findOne({'delivery.deliveryId': undefined}) matchearía un pedido cualquiera
+  // y reventaría más abajo al escribir pedido.delivery.estado.
+  if (!event || !event.deliveryId) {
+    logger.warn({ provider }, 'Webhook sin deliveryId — ignorado');
+    return { ok: false, reason: 'sin deliveryId' };
+  }
+
   // Buscar pedido por deliveryId
   const pedido = await Pedido.findOne({ 'delivery.deliveryId': event.deliveryId });
   if (!pedido) {
@@ -47,6 +55,9 @@ module.exports = async (job, logger) => {
     pedido.delivery.repartidor = event.repartidor;
   }
   pedido.delivery.actualizadoEn = new Date();
+  // Schema strict:false → Mongoose no detecta cambios en sub-objetos no
+  // declarados; sin markModified, save() los ignora silenciosamente.
+  pedido.markModified('delivery');
 
   const nuevoEstadoPedido = ESTADO_MAP[event.estado];
   if (nuevoEstadoPedido && pedido.estado !== nuevoEstadoPedido) {
@@ -56,6 +67,7 @@ module.exports = async (job, logger) => {
       estado: nuevoEstadoPedido,
       nota: `Webhook ${provider}: ${event.estado}`,
     });
+    pedido.markModified('historial');
   }
 
   await pedido.save();
