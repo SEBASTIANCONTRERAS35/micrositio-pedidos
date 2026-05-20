@@ -36,17 +36,17 @@ module.exports = async (job, logger) => {
     const carrier = carriers[proveedor] || carriers.ivoy;
     const result = await carrier.requestDelivery(pedido);
 
-    pedido.delivery = {
+    // .set() en vez de asignación directa: con schema strict:false un campo
+    // NUEVO asignado con "=" no llega al _doc interno de Mongoose y save() lo
+    // ignora aunque se llame markModified. .set() sí lo registra.
+    pedido.set('delivery', {
       proveedor,
       deliveryId: result.deliveryId,
       trackingUrl: result.trackingUrl,
       estado: result.estado,
       costoEnvio: result.costoEnvio,
       actualizadoEn: new Date(),
-    };
-    // Schema strict:false → Mongoose no detecta cambios en sub-objetos no
-    // declarados; sin markModified, save() los ignora silenciosamente.
-    pedido.markModified('delivery');
+    });
     pedido.historial = pedido.historial || [];
     pedido.historial.push({
       estado: 'repartidor_solicitado',
