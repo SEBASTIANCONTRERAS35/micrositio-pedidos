@@ -25,6 +25,11 @@ metadata:
 spec:
   backoffLimit: 4
   template:
+    metadata:
+      # El label app=mongodb-init en el POD (no solo en el Job) es lo que
+      # matchea la NetworkPolicy allow-mongodb-init. Sin esto, default-deny
+      # bloquea al pod y el Job se cuelga esperando a mongo.
+      labels: { app: mongodb-init }
     spec:
       restartPolicy: OnFailure
       tolerations:
