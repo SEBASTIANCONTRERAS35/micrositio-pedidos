@@ -61,7 +61,9 @@ module.exports = async (job, logger) => {
 
   const nuevoEstadoPedido = ESTADO_MAP[event.estado];
   if (nuevoEstadoPedido && pedido.estado !== nuevoEstadoPedido) {
-    pedido.estado = nuevoEstadoPedido;
+    // .set(): schema strict:false → reasignar un campo no declarado con "="
+    // no llega al _doc y save() lo ignora.
+    pedido.set('estado', nuevoEstadoPedido);
     pedido.historial = pedido.historial || [];
     pedido.historial.push({
       estado: nuevoEstadoPedido,
