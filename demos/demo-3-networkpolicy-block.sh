@@ -40,11 +40,21 @@ echo "[5] rogue → redis (esperamos TIMEOUT):"
 timeout 8 kubectl exec rogue -- nc -zv -w 5 redis.micrositio.svc.cluster.local 6379 2>&1 | tail -3
 echo "    ✗ BLOQUEADO por NetworkPolicy ✓ (esperado)"
 
-# ── Paso 6: control - api (autorizado) SÍ puede ──
+# ── Paso 6: control — pod con label app=api (autorizado) SÍ puede ──
 echo ""
-echo "[6] CONTROL — api (con netpol allow-api-to-mongo) SÍ puede conectar:"
-kubectl exec -n micrositio deploy/api -- timeout 5 nc -zv mongodb-0.mongodb-headless.micrositio.svc.cluster.local 27017 2>&1 | tail -2
-echo "    ✓ AUTORIZADO ✓ (api tiene etiqueta app=api permitida)"
+echo "[6] CONTROL — pod con label app=api SÍ conecta a mongo (allow-api-to-mongo):"
+# Pod de prueba con app=api: las NetworkPolicies allow-api-to-mongo +
+# allow-mongo-from-api-worker lo autorizan. Contraste con el rogue (sin label).
+kubectl delete pod test-allowed -n micrositio --ignore-not-found --grace-period=0 --force 2>/dev/null
+kubectl run test-allowed --image=nicolaka/netshoot --restart=Never -n micrositio \
+  --labels="app=api" --command -- sleep 120 >/dev/null 2>&1
+for i in {1..15}; do
+  [ "$(kubectl get pod test-allowed -n micrositio -o jsonpath='{.status.phase}' 2>/dev/null)" = "Running" ] && break
+  sleep 2
+done
+kubectl exec test-allowed -n micrositio -- nc -zv -w 5 mongodb-0.mongodb-headless.micrositio.svc.cluster.local 27017 2>&1 | tail -2
+echo "    ✓ AUTORIZADO (label app=api permitido por allow-api-to-mongo)"
+kubectl delete pod test-allowed -n micrositio --grace-period=0 --force 2>/dev/null >/dev/null
 
 # ── Paso 7: limpiar ──
 echo ""
