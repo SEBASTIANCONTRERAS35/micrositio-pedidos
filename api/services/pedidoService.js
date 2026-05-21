@@ -236,6 +236,48 @@ function esPedidoZuyu(pedido) {
 }
 
 async function cancelarPedido(pedidoId, usuarioId, negocioId) {
+  // Lectura + validacion previa (fuera de transaccion). populateNegocio
+  // para tener el slug que necesita el cliente de ZUYU.
+  const pedidoZuyu = await pedidoRepo.buscarPorId(pedidoId, negocioId, {
+    populateNegocio: true,
+  });
+  if (!pedidoZuyu) {
+    throw new NotFoundError('Pedido no encontrado');
+  }
+  if (!estadoPedido.puedeCancelar(pedidoZuyu.estado)) {
+    throw new Error(`No se puede cancelar pedido ${pedidoZuyu.estado}`);
+  }
+
+  // ── Pedido de ZUYU: ZUYU es source-of-truth del stock ──────────────
+  // La cancelacion en ZUYU es una llamada HTTP — va FUERA de toda
+  // transaccion Mongo (nunca mantener una transaccion abierta durante I/O
+  // de red). ZUYU revierte el stock y es idempotente; solo si responde OK
+  // marcamos el pedido local como cancelado.
+  if (esPedidoZuyu(pedidoZuyu)) {
+    const slug = pedidoZuyu.negocioId?.slug;
+    const resultado = await zuyu.cancelarPedido(
+      slug,
+      pedidoZuyu.referenciaExterna || pedidoZuyu.pedidoId,
+      `Cancelado por usuario ${usuarioId}`
+    );
+    if (!resultado) {
+      // El negocio se desconecto de ZUYU despues de crear el pedido —
+      // no podemos revertir el stock remoto. Marcamos local y avisamos.
+      logger.warn({ pedidoId }, 'Negocio sin conexion ZUYU — cancelacion solo local');
+    }
+    pedidoZuyu.estado = ESTADOS.CANCELADO;
+    pedidoZuyu.historial.push({
+      estado: ESTADOS.CANCELADO,
+      nota: resultado
+        ? `Cancelado por usuario ${usuarioId} (stock revertido en ZUYU)`
+        : `Cancelado por usuario ${usuarioId}`,
+    });
+    await pedidoZuyu.save();
+    logger.info({ pedidoId, zuyuVentaId: pedidoZuyu.zuyuVentaId }, 'Pedido (ZUYU) cancelado');
+    return pedidoZuyu;
+  }
+
+  // ── Pedido local (mock): transaccion atomica devolver stock + marcar ──
   const session = await mongoose.startSession();
   try {
     let pedidoCancelado;
@@ -248,19 +290,7 @@ async function cancelarPedido(pedidoId, usuarioId, negocioId) {
         throw new Error(`No se puede cancelar pedido ${pedido.estado}`);
       }
 
-      if (esPedidoZuyu(pedido)) {
-        // ZUYU es source-of-truth del stock — no tocar Producto local.
-        // TODO: llamar endpoint de cancelacion de ZUYU cuando exista
-        // (publicApi/v1/orders no expone DELETE/cancel hoy). Por ahora
-        // solo marcamos local como cancelado; el dueno debe cancelar
-        // tambien en la app ZUYU si quiere revertir el stock real.
-        logger.info(
-          { pedidoId, zuyuVentaId: pedido.zuyuVentaId },
-          'Pedido de ZUYU — skip devolverStock local'
-        );
-      } else {
-        await productoRepo.devolverStock(pedido.productos, session);
-      }
+      await productoRepo.devolverStock(pedido.productos, session);
 
       pedido.estado = ESTADOS.CANCELADO;
       pedido.historial.push({

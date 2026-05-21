@@ -8,6 +8,7 @@
  *   - producto_eliminado:   marcar inactivo
  *   - stock_actualizado:    actualizar solo stock (mas frecuente)
  *   - pedido_confirmado:    confirmacion de que ZUYU registro el pedido
+ *   - pedido_cancelado:     ZUYU cancelo el pedido — marcar local cancelado
  *
  * IDEMPOTENCIA: BullMQ ya deduplica por jobId=eventId, pero agregamos una
  * segunda capa con un SET NX en Redis (TTL 10 min). Asi, aunque el job se
@@ -136,6 +137,39 @@ module.exports = async (job, logger) => {
       logger.info(
         { referenciaExterna: ref, idVenta: payload?.idVenta },
         'ZUYU confirmo el pedido — enlace zuyuVentaId/idVenta guardado'
+      );
+      break;
+    }
+
+    case 'pedido_cancelado': {
+      // ZUYU cancelo el pedido (desde la app de ZUYU, o es el eco de la
+      // cancelacion que origino el propio micrositio). Marcamos el Pedido
+      // local como cancelado para que el panel del dueno refleje el estado.
+      const Pedido =
+        mongoose.models.Pedido ||
+        mongoose.model('Pedido', new mongoose.Schema({}, { strict: false, collection: 'pedidos' }));
+      const refCancel = payload?.referenciaExterna;
+      if (refCancel) {
+        // El filtro `estado: $ne cancelado` hace la operacion idempotente:
+        // si el micrositio ya lo cancelo localmente, no matchea -> no
+        // duplica el item de historial.
+        await Pedido.updateOne(
+          { referenciaExterna: refCancel, negocioId: negocio._id, estado: { $ne: 'cancelado' } },
+          {
+            $set: { estado: 'cancelado', estadoZuyu: 'cancelado', actualizadoEn: new Date() },
+            $push: {
+              historial: {
+                estado: 'cancelado',
+                timestamp: new Date(),
+                nota: `Cancelado en ZUYU${payload?.motivo ? ': ' + payload.motivo : ''}`,
+              },
+            },
+          }
+        );
+      }
+      logger.info(
+        { referenciaExterna: refCancel },
+        'ZUYU cancelo el pedido — estado local actualizado'
       );
       break;
     }
