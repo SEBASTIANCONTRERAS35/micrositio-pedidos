@@ -146,6 +146,28 @@ async function getEstadoPedido(referenciaExterna, slug) {
 }
 
 /**
+ * Cancela un pedido en ZUYU por su referencia. ZUYU marca la Venta como
+ * CANCELADA, devuelve el stock reservado y emite el evento pedido_cancelado.
+ * Es idempotente: cancelar dos veces no revierte el stock dos veces.
+ *
+ * @param {string} slug
+ * @param {string} referenciaExterna
+ * @param {string} [motivo] - motivo libre de la cancelacion (auditoria)
+ * @returns {object|null} respuesta de ZUYU, o null si el negocio esta en mock
+ */
+async function cancelarPedido(slug, referenciaExterna, motivo) {
+  const cfg = await resolverConfig(slug);
+  if (!cfg.conectado) {
+    return null;
+  } // en mock, pedidoService maneja el stock localmente
+
+  return fetchZuyu(`/orders/${encodeURIComponent(referenciaExterna)}/cancel`, cfg, {
+    method: 'POST',
+    body: JSON.stringify(motivo ? { motivo } : {}),
+  });
+}
+
+/**
  * Healthcheck del API de ZUYU para un negocio.
  */
 async function ping(slug) {
@@ -189,6 +211,7 @@ module.exports = {
   getCatalogo,
   crearPedido,
   getEstadoPedido,
+  cancelarPedido,
   ping,
   estaConectado,
 };
