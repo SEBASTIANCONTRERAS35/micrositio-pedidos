@@ -5,28 +5,29 @@ metadata:
   namespace: ci
 spec:
   params:
-    - name: context-dir
-      description: 'subdir donde esta el Dockerfile'
-      default: api
     - name: image
-      description: 'imagen completa (registry/user/repo:tag)'
+      description: 'imagen destino completa (registry/repo:tag)'
+    - name: dockerfile
+      description: 'ruta del Dockerfile relativa a la raíz del repo'
+      default: api/Dockerfile
     - name: target
-      description: 'stage del Dockerfile'
+      description: 'stage del Dockerfile multi-stage'
       default: production
   workspaces:
     - name: source
-    - name: dockerconfig
-      description: 'credentials para push'
+      description: workspace con el repo clonado en source/repo
   steps:
     - name: build-and-push
       image: gcr.io/kaniko-project/executor:v1.23.2
-      env:
-        - name: DOCKER_CONFIG
-          value: $(workspaces.dockerconfig.path)
+      # --insecure / --skip-tls-verify: el registry local (NodePort 30500) es
+      # HTTP plano. El context es la raíz del repo (monorepo npm workspaces:
+      # el Dockerfile necesita el package-lock.json raíz).
       args:
-        - --dockerfile=$(workspaces.source.path)/$(params.context-dir)/Dockerfile
-        - --context=$(workspaces.source.path)/$(params.context-dir)
+        - --dockerfile=$(workspaces.source.path)/repo/$(params.dockerfile)
+        - --context=$(workspaces.source.path)/repo
         - --destination=$(params.image)
         - --target=$(params.target)
+        - --insecure
+        - --skip-tls-verify
         - --cache=true
         - --cache-ttl=24h
