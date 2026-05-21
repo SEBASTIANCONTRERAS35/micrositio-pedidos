@@ -20,7 +20,17 @@ spec:
       provider:
         prometheus:
           address: http://kps-kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090
+          # `or vector(0/1)` evita que la query devuelva un vector VACÍO cuando
+          # no hay tráfico (canary recién desplegado, o sin errores 5xx). Sin
+          # esto, result[0] revienta con "reflect: slice index out of range"
+          # y el AnalysisRun aborta el Rollout por error, no por error-rate real.
           query: |
-            sum(rate(http_requests_total{namespace="micrositio", app="{{args.service-name}}", status=~"5.."}[1m]))
+            (
+              sum(rate(http_requests_total{namespace="micrositio", app="{{args.service-name}}", status=~"5.."}[1m]))
+              or vector(0)
+            )
             /
-            sum(rate(http_requests_total{namespace="micrositio", app="{{args.service-name}}"}[1m]))
+            (
+              sum(rate(http_requests_total{namespace="micrositio", app="{{args.service-name}}"}[1m])) > 0
+              or vector(1)
+            )
