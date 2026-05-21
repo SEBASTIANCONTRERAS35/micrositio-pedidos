@@ -10,7 +10,7 @@ set -uo pipefail
 
 echo "═══ DEMO 5 — git push → CI/CD ═══"
 
-REPO_DIR="${REPO_DIR:-/Users/emiliocontreras/Downloads/micrositio-pedidos}"
+REPO_DIR="${REPO_DIR:-/Users/emiliocontreras/Downloads/Proyectos/micrositio-pedidos}"
 
 # ── Paso 1: hacer cambio visible en código ──
 echo ""
@@ -38,25 +38,19 @@ metadata:
   namespace: ci
 spec:
   pipelineRef:
-    name: build-and-push
-  taskRunTemplate:
-    serviceAccountName: pipeline-sa
+    name: micrositio-build
   params:
-  - name: repo-url
-    value: https://github.com/SEBASTIANCONTRERAS35/micrositio-pedidos.git
-  - name: image
+  - name: image-api
     value: 10.211.55.30:30500/micrositio-api:demo-$TIMESTAMP
-  - name: dockerfile
-    value: api/Dockerfile
-  - name: context
-    value: repo
+  - name: image-worker
+    value: 10.211.55.30:30500/micrositio-worker:demo-$TIMESTAMP
   workspaces:
-  - name: shared-workspace
+  - name: source
     volumeClaimTemplate:
       spec:
         accessModes: [ReadWriteOnce]
         storageClassName: nfs-csi
-        resources: { requests: { storage: 5Gi } }
+        resources: { requests: { storage: 3Gi } }
 EOF
 )
 echo "    $PIPELINERUN"
@@ -65,7 +59,7 @@ PR_NAME=$(echo "$PIPELINERUN" | grep -oE 'demo-build-[a-z0-9]+')
 
 # ── Paso 4: ver pipeline corriendo en vivo ──
 echo ""
-echo "[4] Esperando build (Tekton clone+kaniko, ~60s):"
+echo "[4] Esperando build (Tekton clone + kaniko api + kaniko worker, ~2 min):"
 for i in {1..40}; do
   R=$(kubectl get pipelinerun "$PR_NAME" -n ci -o jsonpath='{.status.conditions[?(@.type=="Succeeded")].reason}' 2>/dev/null)
   echo "  [${i}*5s] $R"
