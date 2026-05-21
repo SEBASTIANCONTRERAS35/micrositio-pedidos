@@ -50,6 +50,7 @@ module.exports = async (job, logger) => {
     pedido.historial = pedido.historial || [];
     pedido.historial.push({
       estado: 'repartidor_solicitado',
+      timestamp: new Date(),
       nota: `Solicitado a ${proveedor}: ${result.deliveryId}`,
     });
     pedido.markModified('historial');

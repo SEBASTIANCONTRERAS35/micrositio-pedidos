@@ -67,6 +67,7 @@ module.exports = async (job, logger) => {
     pedido.historial = pedido.historial || [];
     pedido.historial.push({
       estado: nuevoEstadoPedido,
+      timestamp: new Date(),
       nota: `Webhook ${provider}: ${event.estado}`,
     });
     pedido.markModified('historial');
