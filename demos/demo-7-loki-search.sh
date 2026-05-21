@@ -10,13 +10,18 @@ echo "═══ DEMO 7 — Búsqueda en Loki por pedidoId ═══"
 # ── Paso 1: pre-generar pedidos para tener data ──
 echo ""
 echo "[1] Pre-generar 3 pedidos para tener data en Loki:"
+# ID de producto REAL del negocio demo (IDs inventados → 400 en validación)
+APP_PASS=$(kubectl get secret mongodb-users -n micrositio -o jsonpath='{.data.APP_PASSWORD}' | base64 -d)
+PROD_ID=$(kubectl exec mongodb-0 -n micrositio -c mongodb -- mongosh --quiet \
+  -u app -p "$APP_PASS" --authenticationDatabase micrositio micrositio \
+  --eval 'const n=db.negocios.findOne({slug:"demo"}); print(db.productos.findOne({negocioId:n._id})._id.toString())' 2>/dev/null | tail -1 | tr -dc 'a-f0-9')
 for i in 1 2 3; do
   curl -k --resolve zuyu.local:443:10.211.55.37 -s -X POST https://zuyu.local/api/pedidos \
     -H "Content-Type: application/json" \
     -d "{
       \"negocioSlug\":\"demo\",
-      \"cliente\":{\"nombre\":\"Cliente $i\",\"telefono\":\"+525555550$i\",\"email\":\"cliente$i@x.mx\",\"direccion\":\"Calle $i\"},
-      \"productos\":[{\"id\":\"PROD-00$i\",\"cantidad\":1}],
+      \"cliente\":{\"nombre\":\"Cliente $i\",\"telefono\":\"+52555555010$i\",\"email\":\"cliente$i@x.mx\",\"direccion\":\"Calle $i 100, CDMX\"},
+      \"productos\":[{\"id\":\"$PROD_ID\",\"cantidad\":1}],
       \"metodoPago\":\"efectivo\"
     }" -o /dev/null -w "  Pedido $i: HTTP %{http_code}\n"
 done
