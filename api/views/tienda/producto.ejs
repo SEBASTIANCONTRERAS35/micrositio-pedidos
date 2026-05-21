@@ -6,9 +6,10 @@
     <title><%= producto.nombre %> — <%= negocio.nombre %></title>
     <meta name="description" content="<%= producto.nombre %> en <%= negocio.nombre %>" />
     <link rel="stylesheet" href="/css/tienda.css" />
+    <script defer src="/js/producto.js"></script>
     <script defer src="/js/alpine.min.js"></script>
   </head>
-  <body x-data="{ cantidad: 1 }">
+  <body x-data="productoView('<%= negocio.slug %>')">
     <header class="ct-header">
       <div class="ct-header__inner">
         <a
@@ -129,20 +130,24 @@
               font-size: 16px;
             "
           />
-          <a
-            href="/tienda/<%= negocio.slug %>"
+          <button
+            type="button"
+            data-producto="<%= JSON.stringify({ id: String(producto._id || producto.id), nombre: producto.nombre, precio: producto.precio, stock: producto.stock }) %>"
+            @click="agregar($el)"
             style="
               margin-left: auto;
               background: #3b82f6;
               color: #fff;
               padding: 12px 24px;
+              border: none;
               border-radius: 8px;
-              text-decoration: none;
               font-weight: 600;
+              font-size: 15px;
+              cursor: pointer;
             "
           >
             Agregar al carrito y continuar
-          </a>
+          </button>
         </div>
         <% } else { %>
         <p
