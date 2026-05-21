@@ -14,17 +14,17 @@ REPO_DIR="${REPO_DIR:-/Users/emiliocontreras/Downloads/micrositio-pedidos}"
 
 # ── Paso 1: hacer cambio visible en código ──
 echo ""
-echo "[1] Cambio trivial: actualizar version string en api/api.js"
+echo "[1] Cambio trivial: actualizar ci-demo-marker en api/api.js"
 cd "$REPO_DIR"
 TIMESTAMP=$(date +%H%M%S)
-echo "    Modificando comment con timestamp $TIMESTAMP..."
-echo "// demo-build $TIMESTAMP" >> api/api.js
+echo "    Actualizando marcador a $TIMESTAMP (idempotente — no acumula líneas)..."
+sed -i.bak "s|// ci-demo-marker:.*|// ci-demo-marker: $TIMESTAMP|" api/api.js && rm -f api/api.js.bak
 
 # ── Paso 2: commit + push ──
 echo ""
 echo "[2] git add + commit + push:"
 git add api/api.js
-git commit -m "demo: trigger ci/cd $TIMESTAMP" 2>&1 | tail -3
+git commit -m "ci: trigger demo build $TIMESTAMP" 2>&1 | tail -3
 git push origin main 2>&1 | tail -2
 
 # ── Paso 3: lanzar PipelineRun (en producción real, Tekton EventListener detectaría el push) ──

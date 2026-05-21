@@ -150,3 +150,5 @@ if (require.main === module) {
 }
 
 module.exports = app;
+
+// ci-demo-marker: inicial
