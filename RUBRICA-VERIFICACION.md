@@ -12,27 +12,27 @@
 | ------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | 3 nodos Running     | `k8s/mongodb/statefulset.yaml` con `replicas: 3`                            | `kubectl get pods -n micrositio -l app=mongodb`             |
 | Transacción atómica | `api/services/pedidoService.js` `crearPedidoConStock` con `withTransaction` | `npm run test:integration` (test "10 pedidos concurrentes") |
-| Tolerancia a fallo  | StatefulSet + Replica Set rs0                                               | `./scripts/demo-2-mongo-failover.sh`                        |
+| Tolerancia a fallo  | StatefulSet + Replica Set rs0                                               | `demos/demo-2-mongo-failover.sh`                            |
 
 **✅ 15/15 pts esperados**
 
 ### 2. NetworkPolicy (15 pts)
 
-| Criterio          | Implementación                                                       |
-| ----------------- | -------------------------------------------------------------------- |
-| Default deny-all  | `k8s/networkpolicy/default-deny-all.yaml`                            |
-| Reglas explícitas | 7 NetworkPolicies adicionales (DNS, mongo, redis, ingress, internet) |
-| Demo de bloqueo   | `./scripts/demo-3-network-policy.sh`                                 |
+| Criterio          | Implementación                                                        |
+| ----------------- | --------------------------------------------------------------------- |
+| Default deny-all  | `k8s/networkpolicy/default-deny-all.yaml`                             |
+| Reglas explícitas | 14 NetworkPolicies adicionales (DNS, mongo, redis, ingress, internet) |
+| Demo de bloqueo   | `demos/demo-3-networkpolicy-block.sh`                                 |
 
 **✅ 15/15 pts esperados**
 
 ### 3. KEDA + Escalado (15 pts)
 
-| Criterio                 | Implementación                                          |
-| ------------------------ | ------------------------------------------------------- |
-| ScaledObject configurado | `k8s/worker/scaledobject-keda.yaml` (3 triggers)        |
-| Scale-up demostrado      | `./scripts/demo-4-keda-scale.sh` (50 jobs → 5 replicas) |
-| Scale-down demostrado    | Mismo script (cooldown 60s → vuelve a 1)                |
+| Criterio                 | Implementación                                      |
+| ------------------------ | --------------------------------------------------- |
+| ScaledObject configurado | `k8s/worker/scaledobject-keda.yaml` (3 triggers)    |
+| Scale-up demostrado      | `demos/demo-4-keda-scale.sh` (50 jobs → 5 replicas) |
+| Scale-down demostrado    | Mismo script (cooldown 60s → vuelve a 1)            |
 
 **✅ 15/15 pts esperados**
 
@@ -42,7 +42,7 @@
 | ---------------------------- | ---------------------------------------------------- |
 | Pipeline completo            | `tekton/pipeline.yaml` (7 steps con Trivy gate)      |
 | git push → deploy automático | ArgoCD selfHeal + prune en `argocd/application.yaml` |
-| Demo en vivo                 | `./scripts/demo-5-cicd.sh`                           |
+| Demo en vivo                 | `demos/demo-5-cicd-git-push.sh`                      |
 
 **✅ 15/15 pts esperados**
 
@@ -51,7 +51,7 @@
 | Criterio                       | Implementación                                    |
 | ------------------------------ | ------------------------------------------------- |
 | Rollout configurado            | `k8s/rollouts/api-rollout.yaml` (steps 10→50→100) |
-| Promoción 10→50→100 demostrada | `./scripts/demo-6-canary.sh`                      |
+| Promoción 10→50→100 demostrada | `demos/demo-6-canary.sh`                          |
 
 **✅ 10/10 pts esperados**
 
@@ -98,7 +98,7 @@
 | Criterio         | Implementación                                                  |
 | ---------------- | --------------------------------------------------------------- |
 | Flujo end-to-end | Cliente pide → dueño confirma → repartidor asignado → entregado |
-| Demo en vivo     | `./scripts/demo-1-flujo-completo.sh`                            |
+| Demo en vivo     | `demos/demo-1-pedido-completo.sh`                               |
 
 **✅ 5/5 pts esperados**
 
@@ -184,7 +184,7 @@
 | Vistas EJS (tienda + panel)      | ✅ COMPLETO |
 | Tests unitarios + integración    | ✅ COMPLETO |
 | Manifiestos K8s                  | ✅ COMPLETO |
-| NetworkPolicies (7)              | ✅ COMPLETO |
+| NetworkPolicies (15)             | ✅ COMPLETO |
 | Cert-manager + Ingress           | ✅ COMPLETO |
 | KEDA ScaledObject                | ✅ COMPLETO |
 | Argo Rollouts + AnalysisTemplate | ✅ COMPLETO |
@@ -192,9 +192,9 @@
 | ArgoCD Application               | ✅ COMPLETO |
 | Loki + Alloy + Prometheus        | ✅ COMPLETO |
 | Alertas                          | ✅ COMPLETO |
-| 7 Scripts de demo                | ✅ COMPLETO |
+| 13 Scripts de demo (8 + 5 extra) | ✅ COMPLETO |
 | 5 ADRs                           | ✅ COMPLETO |
 | README + SECURITY + CONTRIBUTING | ✅ COMPLETO |
-| 9 Checklists por fase            | ✅ COMPLETO |
+| 11 Checklists por fase           | ✅ COMPLETO |
 
 🚀 **Proyecto LISTO para implementación física en cluster.**
