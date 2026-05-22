@@ -95,6 +95,32 @@ describe('Uber Direct provider', () => {
   });
 });
 
+describe('getStatus / cancelDelivery — modo MOCK', () => {
+  it('iVoy getStatus devuelve un estado mock', async () => {
+    expect(await ivoy.getStatus('iv-1')).toEqual({ estado: 'pickup' });
+  });
+
+  it('iVoy cancelDelivery en MOCK devuelve ok', async () => {
+    expect(await ivoy.cancelDelivery('iv-1')).toEqual({ ok: true });
+  });
+
+  it('Lalamove getStatus devuelve un estado mock', async () => {
+    expect(await lalamove.getStatus('la-1')).toEqual({ estado: 'pickup' });
+  });
+
+  it('Lalamove cancelDelivery en MOCK devuelve ok', async () => {
+    expect(await lalamove.cancelDelivery('la-1')).toEqual({ ok: true });
+  });
+
+  it('Uber Direct getStatus devuelve un estado mock', async () => {
+    expect(await uberDirect.getStatus('ub-1')).toEqual({ estado: 'pickup' });
+  });
+
+  it('Uber Direct cancelDelivery en MOCK devuelve ok', async () => {
+    expect(await uberDirect.cancelDelivery('ub-1')).toEqual({ ok: true });
+  });
+});
+
 describe('verifyWebhook — validación de firma HMAC', () => {
   it('iVoy acepta firma válida con timestamp vigente', () => {
     process.env.WEBHOOK_SECRET_IVOY = 'secret-ivoy-para-test';

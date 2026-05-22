@@ -6,11 +6,33 @@
  */
 const crypto = require('crypto');
 const { verifyHmacSignature, isTimestampValid } = require('../../../utils/hmac');
+const { construirOrigenEnvio } = require('../../../domain/envio');
 
 const IS_MOCK = process.env.LALAMOVE_MOCK !== 'false';
 const BASE_URL = process.env.LALAMOVE_BASE_URL || 'https://rest.sandbox.lalamove.com/v3';
 
-async function requestDelivery(pedido) {
+/**
+ * Firma una request al API de Lalamove v3 (HMAC-SHA256). Centraliza el
+ * esquema de firma para que requestDelivery y getStatus no lo dupliquen.
+ * @param {string} method - 'GET' | 'POST'
+ * @param {string} path - ruta firmada, ej. '/v3/orders' o '/v3/orders/123'
+ * @param {string} [body] - body crudo (vacío en GET)
+ * @returns {{ timestamp: number, header: string }}
+ */
+function firmarLalamove(method, path, body = '') {
+  const timestamp = Date.now();
+  const rawSignature = `${timestamp}\r\n${method}\r\n${path}\r\n\r\n${body}`;
+  const signature = crypto
+    .createHmac('sha256', process.env.LALAMOVE_API_SECRET)
+    .update(rawSignature)
+    .digest('hex');
+  return {
+    timestamp,
+    header: `hmac ${process.env.LALAMOVE_API_KEY}:${timestamp}:${signature}`,
+  };
+}
+
+async function requestDelivery(pedido, negocio) {
   if (IS_MOCK) {
     return {
       deliveryId: `lalamove-mock-${pedido.pedidoId}`,
@@ -20,28 +42,24 @@ async function requestDelivery(pedido) {
     };
   }
 
-  // Implementacion real con HMAC
-  const timestamp = Date.now();
+  // Implementacion real con HMAC. El origen (pickup) sale del negocio:
+  // Lalamove cotiza por distancia, asi que necesita coordenadas reales.
+  const origen = construirOrigenEnvio(negocio);
   const body = JSON.stringify({
     serviceType: 'MOTORCYCLE',
     stops: [
-      { coordinates: { lat: 19.4326, lng: -99.1332 }, address: 'TODO: direccion del negocio' },
+      { coordinates: origen.coordinates, address: origen.address },
       { coordinates: { lat: 0, lng: 0 }, address: pedido.cliente.direccion },
     ],
-    requesterContact: { name: pedido.cliente.nombre, phone: pedido.cliente.telefono },
+    requesterContact: { name: origen.name, phone: origen.phone },
     metadata: { pedidoId: pedido.pedidoId },
   });
 
-  const rawSignature = `${timestamp}\r\nPOST\r\n/v3/orders\r\n\r\n${body}`;
-  const signature = crypto
-    .createHmac('sha256', process.env.LALAMOVE_API_SECRET)
-    .update(rawSignature)
-    .digest('hex');
-
+  const { header } = firmarLalamove('POST', '/v3/orders', body);
   const res = await fetch(`${BASE_URL}/orders`, {
     method: 'POST',
     headers: {
-      Authorization: `hmac ${process.env.LALAMOVE_API_KEY}:${timestamp}:${signature}`,
+      Authorization: header,
       'Content-Type': 'application/json',
       Market: 'MX',
     },
@@ -65,15 +83,32 @@ async function getStatus(deliveryId) {
   if (IS_MOCK) {
     return { estado: 'pickup' };
   }
-  // TODO real
-  return { estado: 'pending' };
+  // GET /v3/orders/:id — mismo esquema HMAC que requestDelivery (sin body).
+  // encodeURIComponent: el deliveryId va en la URL — defensa de path.
+  const id = encodeURIComponent(deliveryId);
+  const { header } = firmarLalamove('GET', `/v3/orders/${id}`);
+  const res = await fetch(`${BASE_URL}/orders/${id}`, {
+    headers: { Authorization: header, Market: 'MX' },
+  });
+  if (!res.ok) {
+    throw new Error(`Lalamove status returned ${res.status}`);
+  }
+  const data = await res.json();
+  return { estado: mapEstado(data.status || (data.order && data.order.status)) };
 }
 
 async function cancelDelivery(deliveryId) {
   if (IS_MOCK) {
     return { ok: true };
   }
-  return { ok: false };
+  // DELETE /v3/orders/:id — mismo esquema HMAC que requestDelivery.
+  const id = encodeURIComponent(deliveryId);
+  const { header } = firmarLalamove('DELETE', `/v3/orders/${id}`);
+  const res = await fetch(`${BASE_URL}/orders/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: header, Market: 'MX' },
+  });
+  return { ok: res.ok };
 }
 
 function verifyWebhook(body, headers) {

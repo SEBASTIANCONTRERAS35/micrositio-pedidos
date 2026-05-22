@@ -28,6 +28,13 @@ const negocioSchema = new mongoose.Schema(
       estado: String,
       cp: String,
     },
+    // Coordenadas del negocio — las exigen los carriers que cotizan por
+    // distancia (Lalamove). Opcionales: si faltan, los providers de delivery
+    // usan un fallback (ver domain/envio.js — construirOrigenEnvio).
+    ubicacion: {
+      lat: Number,
+      lng: Number,
+    },
     horarios: {
       apertura: String,
       cierre: String,
