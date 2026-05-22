@@ -22,25 +22,16 @@ const IntegracionSchema = z.object({
   conectado: z.boolean().optional(),
 });
 
-// Vistas EJS
+// Vistas EJS — el panel es un SPA-lite: el servidor entrega el HTML estatico
+// y el JS del cliente lo hidrata leyendo el JWT de localStorage y llamando a
+// /panel/api/me. Por eso el render NO recibe datos del negocio/usuario:
+// evita exponer un placeholder falso ("Mi Negocio") y mantiene la vista
+// como unica fuente de verdad client-side. Ver docs/adr/009.
 router.get('/login', (req, res) => res.render('panel/login'));
 
-router.get('/pedidos', async (req, res) => {
-  // Renderea la vista, los datos se cargan via JS con el JWT del localStorage
-  // Pero necesitamos saber el negocio para el header — usar middleware optional
-  // Por ahora pasamos un negocio vacio si no hay JWT
-  res.render('panel/pedidos', {
-    negocio: { nombre: 'Mi Negocio' },
-    usuario: { email: '' },
-  });
-});
+router.get('/pedidos', (req, res) => res.render('panel/pedidos'));
 
-router.get('/integracion', (req, res) => {
-  res.render('panel/integracion', {
-    negocio: { nombre: 'Mi Negocio' },
-    usuario: { email: '' },
-  });
-});
+router.get('/integracion', (req, res) => res.render('panel/integracion'));
 
 // ── Integracion con ZUYU ─────────────────────────────────────────
 // Estado de la integracion. NUNCA devuelve apiKey/webhookSecret en claro —
