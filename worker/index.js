@@ -16,7 +16,7 @@ const deliveryJob = require('./jobs/delivery');
 const notificacionesJob = require('./jobs/notificaciones');
 const webhookJob = require('./jobs/webhookDelivery');
 const syncZuyuJob = require('./jobs/syncZuyu');
-const { instrumentWorker, startMetricsServer } = require('./metrics');
+const { instrumentWorker, startMetricsServer, startQueueDepthCollector } = require('./metrics');
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
@@ -41,6 +41,7 @@ const connection = {
 };
 
 const workers = [];
+let queueCollector = null;
 
 async function start() {
   // Conectar a MongoDB
@@ -128,11 +129,21 @@ async function start() {
   // HTTP server :3001 para Prometheus scraping
   startMetricsServer(parseInt(process.env.METRICS_PORT || '3001', 10));
 
+  // Colector de profundidad de colas → gauge worker_queue_pending (alerta
+  // QueueBacklogHigh + visibilidad del backlog que dispara KEDA).
+  queueCollector = startQueueDepthCollector(
+    ['delivery', 'notificaciones', 'webhook-delivery', 'sync-zuyu'],
+    connection
+  );
+
   logger.info(`Worker iniciado con ${workers.length} colas + metrics en :3001`);
 }
 
 async function shutdown() {
   logger.info('Cerrando workers...');
+  if (queueCollector) {
+    await queueCollector.stop();
+  }
   await Promise.all(workers.map((w) => w.close()));
   await mongoose.disconnect();
   process.exit(0);

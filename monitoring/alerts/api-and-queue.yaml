@@ -23,8 +23,8 @@ spec:
           labels:
             severity: critical
           annotations:
-            summary: "Tasa de errores 5xx > 5% en API"
-            description: "Mas del 5% de las requests del API estan fallando"
+            summary: 'Tasa de errores 5xx > 5% en API'
+            description: 'Mas del 5% de las requests del API estan fallando'
 
         - alert: ApiHighLatency
           expr: |
@@ -33,7 +33,7 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "P99 latencia del API > 2s"
+            summary: 'P99 latencia del API > 2s'
 
         - alert: PodRestartingFrequently
           expr: |
@@ -42,21 +42,22 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "Pod {{ $labels.pod }} se reinicia frecuentemente"
+            summary: 'Pod {{ $labels.pod }} se reinicia frecuentemente'
 
     - name: micrositio.queue
       interval: 30s
       rules:
         - alert: QueueBacklogHigh
-          # Metric custom expuesta por el worker (TODO: implementar exporter)
+          # Gauge worker_queue_pending — expuesto por worker/metrics.js
+          # (startQueueDepthCollector muestrea getJobCounts cada 15s).
           expr: |
-            redis_list_length{key="bull:notificaciones:wait"} > 100
+            worker_queue_pending{queue="notificaciones"} > 100
           for: 5m
           labels:
             severity: warning
           annotations:
-            summary: "Cola de notificaciones acumulada"
-            description: "Mas de 100 jobs pendientes en cola, KEDA deberia estar escalando"
+            summary: 'Cola de notificaciones acumulada'
+            description: 'Mas de 100 jobs pendientes en cola, KEDA deberia estar escalando'
 
     - name: micrositio.mongodb
       interval: 30s
@@ -67,5 +68,5 @@ spec:
           labels:
             severity: critical
           annotations:
-            summary: "MongoDB no tiene PRIMARY"
-            description: "El Replica Set esta sin nodo primario, las escrituras fallan"
+            summary: 'MongoDB no tiene PRIMARY'
+            description: 'El Replica Set esta sin nodo primario, las escrituras fallan'
