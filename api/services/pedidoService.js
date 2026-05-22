@@ -235,6 +235,23 @@ function esPedidoZuyu(pedido) {
   return (pedido.productos || []).some((p) => !mongoose.Types.ObjectId.isValid(p.id));
 }
 
+/**
+ * Si el pedido ya tenia un repartidor solicitado, encola la cancelacion del
+ * delivery en el carrier. Fire-and-forget: no bloquea la cancelacion del
+ * pedido y el worker reintenta si el carrier falla. Se llama SIEMPRE fuera de
+ * la transaccion Mongo (es I/O a Redis).
+ */
+async function cancelarRepartidorSiAplica(pedido) {
+  const deliveryId = pedido && pedido.delivery && pedido.delivery.deliveryId;
+  if (!deliveryId) {
+    return;
+  }
+  await colaDelivery.add('cancelar-repartidor', {
+    deliveryId,
+    proveedor: pedido.delivery.proveedor,
+  });
+}
+
 async function cancelarPedido(pedidoId, usuarioId, negocioId) {
   // Lectura + validacion previa (fuera de transaccion). populateNegocio
   // para tener el slug que necesita el cliente de ZUYU.
@@ -273,6 +290,7 @@ async function cancelarPedido(pedidoId, usuarioId, negocioId) {
         : `Cancelado por usuario ${usuarioId}`,
     });
     await pedidoZuyu.save();
+    await cancelarRepartidorSiAplica(pedidoZuyu);
     logger.info({ pedidoId, zuyuVentaId: pedidoZuyu.zuyuVentaId }, 'Pedido (ZUYU) cancelado');
     return pedidoZuyu;
   }
@@ -301,6 +319,7 @@ async function cancelarPedido(pedidoId, usuarioId, negocioId) {
       pedidoCancelado = pedido;
     });
 
+    await cancelarRepartidorSiAplica(pedidoCancelado);
     logger.info({ pedidoId }, 'Pedido cancelado');
     return pedidoCancelado;
   } finally {

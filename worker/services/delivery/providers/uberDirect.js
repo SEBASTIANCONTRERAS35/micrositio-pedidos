@@ -3,7 +3,8 @@
  * Por defecto en MOCK
  * Doc: https://developer.uber.com/docs/deliveries/overview
  */
-const { verifyHmacSignature, isTimestampValid } = require('../../../utils/hmac');
+const { verifyHmacSignature } = require('../../../utils/hmac');
+const { construirOrigenEnvio } = require('../../../domain/envio');
 
 const IS_MOCK = process.env.UBER_MOCK !== 'false';
 const BASE_URL = process.env.UBER_BASE_URL || 'https://api.uber.com/v1';
@@ -36,7 +37,7 @@ async function getAccessToken() {
   return cachedToken;
 }
 
-async function requestDelivery(pedido) {
+async function requestDelivery(pedido, negocio) {
   if (IS_MOCK) {
     return {
       deliveryId: `uber-mock-${pedido.pedidoId}`,
@@ -48,6 +49,7 @@ async function requestDelivery(pedido) {
 
   const token = await getAccessToken();
   const customerId = process.env.UBER_CUSTOMER_ID;
+  const origen = construirOrigenEnvio(negocio);
 
   const res = await fetch(`${BASE_URL}/customers/${customerId}/deliveries`, {
     method: 'POST',
@@ -56,9 +58,10 @@ async function requestDelivery(pedido) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      pickup_address: 'TODO: direccion del negocio',
-      pickup_name: 'Negocio',
-      pickup_phone_number: '+525555555555',
+      pickup_address: origen.address,
+      pickup_name: origen.name,
+      // Uber exige un telefono de pickup; fallback si el negocio no lo tiene.
+      pickup_phone_number: origen.phone || '+525555555555',
       dropoff_address: pedido.cliente.direccion,
       dropoff_name: pedido.cliente.nombre,
       dropoff_phone_number: pedido.cliente.telefono,
