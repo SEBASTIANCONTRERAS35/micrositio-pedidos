@@ -1,25 +1,22 @@
-# Helm values para grafana/alloy (reemplazo de Promtail)
-# Recolecta logs de pods en namespace 'micrositio' y los envia a Loki
-# Extrae el campo 'pedidoId' del JSON para hacer querys por pedido
+# Helm values para grafana/alloy (reemplazo de Promtail).
+# Recolecta logs de pods de TODO el cluster y los envía a Loki.
+# Extrae el campo 'pedidoId' del JSON para poder hacer querys por pedido.
 
 alloy:
   configMap:
     create: true
     content: |-
       logging {
-        level = "info"
+        level  = "info"
         format = "json"
       }
 
-      // Discovery: pods en namespace micrositio
+      // Discovery: pods de TODOS los namespaces del cluster (sin filtro).
       discovery.kubernetes "pods" {
         role = "pod"
-        namespaces {
-          names = ["micrositio"]
-        }
       }
 
-      // Relabeling: extraer namespace, pod, container, app
+      // Relabeling: extraer namespace, pod, container, app como labels.
       discovery.relabel "pod_logs" {
         targets = discovery.kubernetes.pods.targets
         rule {
@@ -40,22 +37,24 @@ alloy:
         }
       }
 
-      // Source: leer logs del filesystem
+      // Source: leer los logs de los pods descubiertos.
       loki.source.kubernetes "pods" {
         targets    = discovery.relabel.pod_logs.output
         forward_to = [loki.process.json.receiver]
       }
 
-      // Process: parsear JSON y extraer pedidoId como label
+      // Process: parsear JSON y extraer pedidoId/level como labels. Solo
+      // aplica a los logs JSON del micrositio; el resto del cluster (logs
+      // de texto plano) pasa sin esos labels — no rompe nada.
       loki.process "json" {
         forward_to = [loki.write.default.receiver]
 
         stage.json {
           expressions = {
-            pedidoId  = "pedidoId",
-            level     = "level",
-            msg       = "msg",
-            err       = "err.message",
+            pedidoId = "pedidoId",
+            level    = "level",
+            msg      = "msg",
+            err      = "err.message",
           }
         }
 
@@ -67,10 +66,10 @@ alloy:
         }
       }
 
-      // Write: enviar a Loki
+      // Write: enviar a Loki (namespace observability — donde corre Loki).
       loki.write "default" {
         endpoint {
-          url = "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push"
+          url = "http://loki.observability.svc.cluster.local:3100/loki/api/v1/push"
         }
       }
 
@@ -79,6 +78,7 @@ controller:
   podLabels:
     app: alloy
 
+# Recolectar todo el cluster procesa más logs → un poco más de RAM.
 resources:
   requests: { cpu: 50m, memory: 128Mi }
-  limits: { cpu: 200m, memory: 256Mi }
+  limits: { cpu: 300m, memory: 512Mi }
