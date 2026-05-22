@@ -62,11 +62,15 @@ spec:
     - name: micrositio.mongodb
       interval: 30s
       rules:
-        - alert: MongoDBNoPrimary
-          expr: mongodb_replset_my_state{set="rs0"} != 1 and mongodb_replset_my_state{set="rs0"} != 2
+        - alert: MongoDBSinQuorum
+          # Sin un mongodb-exporter dedicado usamos kube-state-metrics: las
+          # réplicas READY del StatefulSet. Con menos de 2 de 3 listas el
+          # Replica Set pierde quórum → no hay PRIMARY → las escrituras fallan.
+          expr: |
+            kube_statefulset_status_replicas_ready{namespace="micrositio", statefulset="mongodb"} < 2
           for: 1m
           labels:
             severity: critical
           annotations:
-            summary: 'MongoDB no tiene PRIMARY'
-            description: 'El Replica Set esta sin nodo primario, las escrituras fallan'
+            summary: 'MongoDB Replica Set sin quórum'
+            description: 'Menos de 2 de 3 réplicas de MongoDB están listas — el RS pierde quórum y las escrituras fallan'
