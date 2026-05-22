@@ -12,6 +12,7 @@
 
 const http = require('http');
 const promClient = require('prom-client');
+const { Queue } = require('bullmq');
 
 const register = new promClient.Registry();
 register.setDefaultLabels({ app: 'worker', service: 'micrositio-worker' });
@@ -35,6 +36,15 @@ const jobDuration = new promClient.Histogram({
 const activeJobs = new promClient.Gauge({
   name: 'worker_active_jobs',
   help: 'Jobs activos por cola',
+  labelNames: ['queue'],
+  registers: [register],
+});
+
+// Profundidad de cola: jobs esperando ser procesados. Lo consume la alerta
+// QueueBacklogHigh y refleja lo mismo que ve KEDA para escalar.
+const queuePending = new promClient.Gauge({
+  name: 'worker_queue_pending',
+  help: 'Jobs pendientes (waiting + delayed) por cola BullMQ',
   labelNames: ['queue'],
   registers: [register],
 });
@@ -75,4 +85,47 @@ function startMetricsServer(port = 3001) {
   return server;
 }
 
-module.exports = { register, instrumentWorker, startMetricsServer };
+/**
+ * Muestrea la profundidad de cada cola BullMQ y actualiza worker_queue_pending.
+ * Exportado para poder testear el sampling sin levantar el colector completo.
+ *
+ * @param {import('bullmq').Queue[]} queues
+ */
+async function sampleQueueDepth(queues) {
+  for (const q of queues) {
+    try {
+      const counts = await q.getJobCounts('wait', 'delayed');
+      queuePending.labels(q.name).set((counts.wait || 0) + (counts.delayed || 0));
+    } catch {
+      // Redis temporalmente inaccesible — las métricas nunca deben tumbar
+      // el worker. La siguiente muestra reintenta.
+    }
+  }
+}
+
+/**
+ * Arranca un colector periódico de profundidad de colas. Crea un Queue
+ * read-only por nombre y actualiza el gauge cada `intervalMs`.
+ *
+ * @returns {{ stop: () => Promise<void> }}
+ */
+function startQueueDepthCollector(queueNames, connection, intervalMs = 15000) {
+  const queues = queueNames.map((name) => new Queue(name, { connection }));
+  const timer = setInterval(() => sampleQueueDepth(queues), intervalMs);
+  timer.unref(); // las métricas no deben impedir que el proceso termine
+  sampleQueueDepth(queues); // primera muestra inmediata
+  return {
+    async stop() {
+      clearInterval(timer);
+      await Promise.all(queues.map((q) => q.close()));
+    },
+  };
+}
+
+module.exports = {
+  register,
+  instrumentWorker,
+  startMetricsServer,
+  startQueueDepthCollector,
+  sampleQueueDepth,
+};
