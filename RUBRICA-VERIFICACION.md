@@ -38,11 +38,11 @@
 
 ### 4. CI/CD (Tekton + ArgoCD) (15 pts)
 
-| Criterio                     | Implementación                                       |
-| ---------------------------- | ---------------------------------------------------- |
-| Pipeline completo            | `tekton/pipeline.yaml` (7 steps con Trivy gate)      |
-| git push → deploy automático | ArgoCD selfHeal + prune en `argocd/application.yaml` |
-| Demo en vivo                 | `demos/demo-5-cicd-git-push.sh`                      |
+| Criterio                     | Implementación                                                                                                        |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Pipeline completo            | `tekton/pipeline.yaml` (3 tasks: clone → build-api → build-worker, Kaniko con doble push registry local + Docker Hub) |
+| git push → deploy automático | EventListener Tekton (HMAC) dispara build + ArgoCD selfHeal + prune en `argocd/application.yaml`                      |
+| Demo en vivo                 | `demos/demo-5-cicd-git-push.sh`                                                                                       |
 
 **✅ 15/15 pts esperados**
 

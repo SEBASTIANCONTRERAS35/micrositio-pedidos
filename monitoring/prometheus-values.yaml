@@ -19,7 +19,7 @@ prometheus:
 
 grafana:
   enabled: true
-  adminPassword: "admin-cambiar-en-produccion"
+  adminPassword: 'admin-cambiar-en-produccion'
   persistence:
     enabled: true
     storageClassName: nfs-csi
@@ -31,11 +31,11 @@ grafana:
         - name: Loki
           type: loki
           access: proxy
-          url: http://loki.monitoring.svc.cluster.local:3100
+          url: http://loki.observability.svc.cluster.local:3100
         - name: Prometheus
           type: prometheus
           access: proxy
-          url: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+          url: http://kps-kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090
           isDefault: true
   service:
     type: ClusterIP
