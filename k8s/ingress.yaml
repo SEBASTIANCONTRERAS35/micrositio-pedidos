@@ -9,7 +9,7 @@ metadata:
 spec:
   secretName: zuyu-local-tls
   issuerRef:
-    name: zuyu-ca-issuer
+    name: ca-issuer
     kind: ClusterIssuer
   commonName: zuyu.local
   dnsNames:
