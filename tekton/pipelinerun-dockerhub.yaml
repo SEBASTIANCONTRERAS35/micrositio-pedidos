@@ -1,0 +1,36 @@
+# PipelineRun con DOBLE PUSH: registry local + mirror en Docker Hub.
+#
+# Construye cada imagen UNA sola vez y la publica simultáneamente en:
+#   - 10.211.55.30:30500/...        (registry local — lo que el cluster pullea)
+#   - docker.io/<usuario>/...        (Docker Hub — vitrina pública verificable)
+#
+# Requisito previo: el Secret 'docker-hub-credentials' debe existir en el
+# namespace 'ci' (se crea desde el SealedSecret).
+#
+# Disparar: kubectl create -f tekton/pipelinerun-dockerhub.yaml
+#
+# ⚠️ Reemplazar TU_USUARIO_DOCKERHUB por el usuario real de Docker Hub.
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: micrositio-build-dh-
+  namespace: ci
+spec:
+  pipelineRef:
+    name: micrositio-build
+  params:
+    - name: image-api-mirror
+      value:
+        - '--destination=docker.io/sebasco3547/micrositio-api:latest'
+    - name: image-worker-mirror
+      value:
+        - '--destination=docker.io/sebasco3547/micrositio-worker:latest'
+  workspaces:
+    - name: source
+      volumeClaimTemplate:
+        spec:
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 3Gi
+          storageClassName: nfs-csi

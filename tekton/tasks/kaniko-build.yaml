@@ -6,28 +6,55 @@ metadata:
 spec:
   params:
     - name: image
-      description: 'imagen destino completa (registry/repo:tag)'
+      description: 'imagen destino principal (registry/repo:tag). Es la que el cluster pullea.'
     - name: dockerfile
       description: 'ruta del Dockerfile relativa a la raíz del repo'
       default: api/Dockerfile
     - name: target
       description: 'stage del Dockerfile multi-stage'
       default: production
+    - name: extra-destinations
+      type: array
+      description: >-
+        Destinos adicionales para el MISMO build (ej. un mirror en Docker Hub).
+        Cada elemento debe ser un flag completo: "--destination=docker.io/usuario/repo:tag".
+        Vacío (default) = solo se publica en el destino principal, sin cambios de
+        comportamiento. Kaniko construye la imagen UNA vez y la empuja a todos los
+        destinos en la misma corrida.
+      default: []
   workspaces:
     - name: source
       description: workspace con el repo clonado en source/repo
+  # Secret con credenciales de Docker Hub en formato dockerconfigjson.
+  # optional:true → la task sigue corriendo aunque el Secret no exista
+  # (builds local-only no requieren credenciales del Hub). Se renombra la
+  # clave .dockerconfigjson → config.json, que es donde Kaniko busca el login.
+  volumes:
+    - name: docker-config
+      secret:
+        secretName: docker-hub-credentials
+        optional: true
+        items:
+          - key: .dockerconfigjson
+            path: config.json
   steps:
     - name: build-and-push
       image: gcr.io/kaniko-project/executor:v1.23.2
-      # --insecure / --skip-tls-verify: el registry local (NodePort 30500) es
-      # HTTP plano. El context es la raíz del repo (monorepo npm workspaces:
-      # el Dockerfile necesita el package-lock.json raíz).
+      # Las flags insecure son POR-REGISTRY (no globales): solo el registry
+      # local (NodePort 30500) habla HTTP plano. Docker Hub usa HTTPS normal,
+      # así que NO debe marcarse insecure o el push al Hub fallaría.
+      # El context es la raíz del repo (monorepo npm workspaces: el Dockerfile
+      # necesita el package-lock.json raíz).
       args:
         - --dockerfile=$(workspaces.source.path)/repo/$(params.dockerfile)
         - --context=$(workspaces.source.path)/repo
         - --destination=$(params.image)
+        - $(params.extra-destinations[*])
         - --target=$(params.target)
-        - --insecure
-        - --skip-tls-verify
+        - --insecure-registry=10.211.55.30:30500
+        - --skip-tls-verify-registry=10.211.55.30:30500
         - --cache=true
         - --cache-ttl=24h
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker
