@@ -1,0 +1,20 @@
+# TriggerBinding: extrae datos del payload JSON que manda GitHub en un push.
+#
+# GitHub envía un body con (entre muchos campos):
+#   body.after                  → SHA del commit recién pusheado
+#   body.repository.clone_url   → URL https del repo
+#
+# Estos valores se pasan al TriggerTemplate, que los inyecta en el PipelineRun.
+# Usar el SHA exacto (no "main") hace el build REPRODUCIBLE: se construye
+# justo el commit que disparó el webhook, no "lo que haya en main ahora".
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: github-push-binding
+  namespace: ci
+spec:
+  params:
+    - name: git-revision
+      value: $(body.after)
+    - name: git-repo-url
+      value: $(body.repository.clone_url)
