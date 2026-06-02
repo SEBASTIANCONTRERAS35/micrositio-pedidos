@@ -42,6 +42,17 @@ spec:
       serviceAccountName: api-sa
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 30
+      # Reparte 1 pod api por nodo (maxSkew:1 tolera el pod surge del Canary:
+      # 2-1 durante el despliegue, 1-1 en reposo). Necesario para que
+      # internalTrafficPolicy:Local del Service api tenga endpoint local en
+      # cada nodo donde corre un ingress-nginx (DaemonSet).
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: api
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
