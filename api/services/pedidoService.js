@@ -58,9 +58,9 @@ async function generarPedidoId() {
   const now = new Date();
   const ym = `${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}`;
   const counterKey = `counter:pedido:${ym}`;
-  const seq = await redis.incr(counterKey);
+  const secuencia = await redis.incr(counterKey);
   await redis.expire(counterKey, 60 * 60 * 24 * 60); // 60 dias
-  return `PED-${ym}-${String(seq).padStart(4, '0')}`;
+  return `PED-${ym}-${String(secuencia).padStart(4, '0')}`;
 }
 
 /**
@@ -91,8 +91,8 @@ async function crearPedidoConStock(input) {
  */
 async function crearPedidoLocal(negocio, input) {
   // 1. Cargar productos para el snapshot
-  const ids = input.productos.map((p) => p.id);
-  const productosDb = await productoRepo.buscarActivosPorIds(ids, negocio._id);
+  const idsProductos = input.productos.map((p) => p.id);
+  const productosDb = await productoRepo.buscarActivosPorIds(idsProductos, negocio._id);
 
   // 2. Dominio puro: construir snapshot + detectar problemas
   const { snapshot, faltantes, noEncontrados } = construirSnapshot(input.productos, productosDb);
@@ -111,8 +111,8 @@ async function crearPedidoLocal(negocio, input) {
   try {
     let pedidoCreado;
     await session.withTransaction(async () => {
-      const ok = await productoRepo.descontarStock(snapshot, session);
-      if (!ok) {
+      const exito = await productoRepo.descontarStock(snapshot, session);
+      if (!exito) {
         throw new StockInsuficienteError('alguno');
       }
       pedidoCreado = await pedidoRepo.crearEnSession(

@@ -12,16 +12,16 @@ function loginForm() {
       this.submitting = true;
       this.error = '';
       try {
-        const res = await fetch('/api/auth/login', {
+        const respuesta = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email, password: this.password }),
         });
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.message || 'Credenciales invalidas');
+        if (!respuesta.ok) {
+          const error = await respuesta.json();
+          throw new Error(error.message || 'Credenciales invalidas');
         }
-        const { accessToken } = await res.json();
+        const { accessToken } = await respuesta.json();
         localStorage.setItem('panel_token', accessToken);
         window.location.href = '/panel/pedidos';
       } catch (e) {

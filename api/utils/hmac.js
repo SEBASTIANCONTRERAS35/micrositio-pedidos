@@ -16,19 +16,19 @@ function verifyHmacSignature(body, signature, secret) {
     return false;
   }
 
-  const cleanSignature = signature.replace(/^sha256=/, '');
+  const firmaLimpia = signature.replace(/^sha256=/, '');
 
-  const computed = crypto
+  const calculado = crypto
     .createHmac('sha256', secret)
     .update(typeof body === 'string' ? body : body.toString('utf8'))
     .digest('hex');
 
-  if (computed.length !== cleanSignature.length) {
+  if (calculado.length !== firmaLimpia.length) {
     return false;
   }
 
   try {
-    return crypto.timingSafeEqual(Buffer.from(computed, 'hex'), Buffer.from(cleanSignature, 'hex'));
+    return crypto.timingSafeEqual(Buffer.from(calculado, 'hex'), Buffer.from(firmaLimpia, 'hex'));
   } catch {
     return false;
   }
@@ -76,14 +76,14 @@ function verifyZuyuSignature(rawBody, signatureHeader, secrets, toleranceSeconds
     return false;
   }
 
-  const parts = Object.fromEntries(
+  const partes = Object.fromEntries(
     signatureHeader.split(',').map((p) => {
       const idx = p.indexOf('=');
       return [p.slice(0, idx).trim(), p.slice(idx + 1).trim()];
     })
   );
 
-  const t = parseInt(parts.t, 10);
+  const t = parseInt(partes.t, 10);
   if (!t || Number.isNaN(t)) {
     return false;
   }
@@ -93,17 +93,17 @@ function verifyZuyuSignature(rawBody, signatureHeader, secrets, toleranceSeconds
     return false;
   }
 
-  const candidateSigs = [parts.v1, parts.v0].filter(Boolean);
-  const signedPayload = `${t}.${rawBody}`;
+  const firmasCandidatas = [partes.v1, partes.v0].filter(Boolean);
+  const payloadFirmado = `${t}.${rawBody}`;
 
   for (const secret of secrets.filter(Boolean)) {
-    const expected = crypto.createHmac('sha256', secret).update(signedPayload).digest('hex');
-    for (const sig of candidateSigs) {
-      if (sig.length !== expected.length) {
+    const esperado = crypto.createHmac('sha256', secret).update(payloadFirmado).digest('hex');
+    for (const firma of firmasCandidatas) {
+      if (firma.length !== esperado.length) {
         continue;
       }
       try {
-        if (crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))) {
+        if (crypto.timingSafeEqual(Buffer.from(firma, 'hex'), Buffer.from(esperado, 'hex'))) {
           return true;
         }
       } catch {

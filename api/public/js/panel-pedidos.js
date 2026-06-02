@@ -94,15 +94,15 @@ function panelPedidos() {
     async _accion(id, accion, mensaje) {
       const token = localStorage.getItem('panel_token');
       try {
-        const res = await fetch('/api/pedidos/' + id + '/' + accion, {
+        const respuesta = await fetch('/api/pedidos/' + id + '/' + accion, {
           method: 'POST',
           headers: { Authorization: 'Bearer ' + token },
         });
-        if (!res.ok) {
-          let detalle = res.status + '';
+        if (!respuesta.ok) {
+          let detalle = respuesta.status + '';
           try {
-            const body = await res.json();
-            detalle = body.message || body.error || detalle;
+            const cuerpo = await respuesta.json();
+            detalle = cuerpo.message || cuerpo.error || detalle;
           } catch (_) {}
           alert('No se pudo ' + accion + ' el pedido: ' + detalle);
           return;

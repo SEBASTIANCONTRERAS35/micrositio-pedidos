@@ -13,14 +13,14 @@ function sanitize(obj) {
     return obj.map(sanitize);
   }
 
-  const cleaned = {};
+  const limpiado = {};
   for (const [key, value] of Object.entries(obj)) {
     if (key.startsWith('$') || key.includes('.')) {
       continue;
     }
-    cleaned[key] = typeof value === 'object' ? sanitize(value) : value;
+    limpiado[key] = typeof value === 'object' ? sanitize(value) : value;
   }
-  return cleaned;
+  return limpiado;
 }
 
 function mongoSanitize(req, res, next) {

@@ -9,15 +9,15 @@ const { construirOrigenEnvio } = require('../../../domain/envio');
 const IS_MOCK = process.env.UBER_MOCK !== 'false';
 const BASE_URL = process.env.UBER_BASE_URL || 'https://api.uber.com/v1';
 
-let cachedToken = null;
-let tokenExpiresAt = 0;
+let tokenCacheado = null;
+let tokenExpiraEn = 0;
 
 async function getAccessToken() {
-  if (cachedToken && Date.now() < tokenExpiresAt) {
-    return cachedToken;
+  if (tokenCacheado && Date.now() < tokenExpiraEn) {
+    return tokenCacheado;
   }
 
-  const res = await fetch('https://login.uber.com/oauth/v2/token', {
+  const respuesta = await fetch('https://login.uber.com/oauth/v2/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -28,13 +28,13 @@ async function getAccessToken() {
     }),
   });
 
-  if (!res.ok) {
-    throw new Error(`Uber OAuth returned ${res.status}`);
+  if (!respuesta.ok) {
+    throw new Error(`Uber OAuth returned ${respuesta.status}`);
   }
-  const data = await res.json();
-  cachedToken = data.access_token;
-  tokenExpiresAt = Date.now() + (data.expires_in - 60) * 1000;
-  return cachedToken;
+  const datos = await respuesta.json();
+  tokenCacheado = datos.access_token;
+  tokenExpiraEn = Date.now() + (datos.expires_in - 60) * 1000;
+  return tokenCacheado;
 }
 
 async function requestDelivery(pedido, negocio) {
@@ -51,7 +51,7 @@ async function requestDelivery(pedido, negocio) {
   const customerId = process.env.UBER_CUSTOMER_ID;
   const origen = construirOrigenEnvio(negocio);
 
-  const res = await fetch(`${BASE_URL}/customers/${customerId}/deliveries`, {
+  const respuesta = await fetch(`${BASE_URL}/customers/${customerId}/deliveries`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -65,25 +65,25 @@ async function requestDelivery(pedido, negocio) {
       dropoff_address: pedido.cliente.direccion,
       dropoff_name: pedido.cliente.nombre,
       dropoff_phone_number: pedido.cliente.telefono,
-      manifest_items: pedido.productos.map((p) => ({
-        name: p.nombre,
-        quantity: p.cantidad,
-        price: Math.round(p.precioUnitario * 100), // centavos
+      manifest_items: pedido.productos.map((producto) => ({
+        name: producto.nombre,
+        quantity: producto.cantidad,
+        price: Math.round(producto.precioUnitario * 100), // centavos
       })),
       external_id: pedido.pedidoId,
     }),
   });
 
-  if (!res.ok) {
-    throw new Error(`Uber Direct returned ${res.status}: ${await res.text()}`);
+  if (!respuesta.ok) {
+    throw new Error(`Uber Direct returned ${respuesta.status}: ${await respuesta.text()}`);
   }
-  const data = await res.json();
+  const datos = await respuesta.json();
 
   return {
-    deliveryId: data.id,
-    trackingUrl: data.tracking_url,
+    deliveryId: datos.id,
+    trackingUrl: datos.tracking_url,
     estado: 'pending',
-    costoEnvio: (data.fee || 4900) / 100,
+    costoEnvio: (datos.fee || 4900) / 100,
   };
 }
 
@@ -93,14 +93,14 @@ async function getStatus(deliveryId) {
   }
   const token = await getAccessToken();
   const customerId = process.env.UBER_CUSTOMER_ID;
-  const res = await fetch(`${BASE_URL}/customers/${customerId}/deliveries/${deliveryId}`, {
+  const respuesta = await fetch(`${BASE_URL}/customers/${customerId}/deliveries/${deliveryId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) {
-    throw new Error(`Uber status returned ${res.status}`);
+  if (!respuesta.ok) {
+    throw new Error(`Uber status returned ${respuesta.status}`);
   }
-  const data = await res.json();
-  return { estado: mapEstado(data.status) };
+  const datos = await respuesta.json();
+  return { estado: mapEstado(datos.status) };
 }
 
 async function cancelDelivery(deliveryId) {
@@ -109,21 +109,24 @@ async function cancelDelivery(deliveryId) {
   }
   const token = await getAccessToken();
   const customerId = process.env.UBER_CUSTOMER_ID;
-  const res = await fetch(`${BASE_URL}/customers/${customerId}/deliveries/${deliveryId}/cancel`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return { ok: res.ok };
+  const respuesta = await fetch(
+    `${BASE_URL}/customers/${customerId}/deliveries/${deliveryId}/cancel`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  return { ok: respuesta.ok };
 }
 
 function verifyWebhook(body, headers) {
-  const secret = process.env.WEBHOOK_SECRET_UBER;
-  if (!secret) {
+  const secreto = process.env.WEBHOOK_SECRET_UBER;
+  if (!secreto) {
     return true;
   } // dev only
-  const signature = headers['x-uber-signature'];
+  const firma = headers['x-uber-signature'];
   // Uber no envia timestamp explicito, depende del header X-Uber-Date
-  return verifyHmacSignature(body, signature, secret);
+  return verifyHmacSignature(body, firma, secreto);
 }
 
 function parseWebhook(body) {
@@ -141,7 +144,7 @@ function parseWebhook(body) {
 }
 
 function mapEstado(s) {
-  const map = {
+  const mapa = {
     pending: 'pending',
     pickup: 'pickup',
     pickup_complete: 'pickup',
@@ -150,7 +153,7 @@ function mapEstado(s) {
     canceled: 'cancelled',
     returned: 'failed',
   };
-  return map[s] || 'pending';
+  return mapa[s] || 'pending';
 }
 
 module.exports = { requestDelivery, getStatus, cancelDelivery, verifyWebhook, parseWebhook };

@@ -33,7 +33,7 @@ function checkoutForm(slug) {
       this.error = '';
       try {
         const idempotencyKey = crypto.randomUUID();
-        const res = await fetch('/api/pedidos', {
+        const respuesta = await fetch('/api/pedidos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
           body: JSON.stringify({
@@ -49,11 +49,11 @@ function checkoutForm(slug) {
             notas: this.form.notas || undefined,
           }),
         });
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.message || 'Error al crear pedido');
+        if (!respuesta.ok) {
+          const error = await respuesta.json();
+          throw new Error(error.message || 'Error al crear pedido');
         }
-        const pedido = await res.json();
+        const pedido = await respuesta.json();
         localStorage.removeItem(STORAGE_KEY);
         window.location.href = '/tienda/' + slug + '/pedido/' + pedido.pedidoId;
       } catch (e) {

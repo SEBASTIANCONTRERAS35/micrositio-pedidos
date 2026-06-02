@@ -51,38 +51,38 @@ const queuePending = new promClient.Gauge({
 
 /** Conecta los eventos de BullMQ Worker a las métricas. */
 function instrumentWorker(worker) {
-  const queueName = worker.name;
-  worker.on('active', () => activeJobs.labels(queueName).inc());
+  const nombreCola = worker.name;
+  worker.on('active', () => activeJobs.labels(nombreCola).inc());
   worker.on('completed', (job) => {
-    activeJobs.labels(queueName).dec();
-    jobsTotal.labels(queueName, 'completed').inc();
+    activeJobs.labels(nombreCola).dec();
+    jobsTotal.labels(nombreCola, 'completed').inc();
     if (job?.processedOn && job?.timestamp) {
-      jobDuration.labels(queueName).observe((job.processedOn - job.timestamp) / 1000);
+      jobDuration.labels(nombreCola).observe((job.processedOn - job.timestamp) / 1000);
     }
   });
   worker.on('failed', () => {
-    activeJobs.labels(queueName).dec();
-    jobsTotal.labels(queueName, 'failed').inc();
+    activeJobs.labels(nombreCola).dec();
+    jobsTotal.labels(nombreCola, 'failed').inc();
   });
 }
 
 /** Arranca servidor HTTP en :3001 con endpoint /metrics. */
 function startMetricsServer(port = 3001) {
-  const server = http.createServer(async (req, res) => {
+  const servidor = http.createServer(async (req, respuesta) => {
     if (req.url === '/metrics') {
-      res.setHeader('Content-Type', register.contentType);
-      res.end(await register.metrics());
+      respuesta.setHeader('Content-Type', register.contentType);
+      respuesta.end(await register.metrics());
     } else if (req.url === '/healthz') {
-      res.end('ok');
+      respuesta.end('ok');
     } else {
-      res.statusCode = 404;
-      res.end();
+      respuesta.statusCode = 404;
+      respuesta.end();
     }
   });
-  server.listen(port, '0.0.0.0', () => {
+  servidor.listen(port, '0.0.0.0', () => {
     console.log(`[metrics] HTTP server on :${port}/metrics`);
   });
-  return server;
+  return servidor;
 }
 
 /**
@@ -91,11 +91,11 @@ function startMetricsServer(port = 3001) {
  *
  * @param {import('bullmq').Queue[]} queues
  */
-async function sampleQueueDepth(queues) {
-  for (const q of queues) {
+async function sampleQueueDepth(colas) {
+  for (const q of colas) {
     try {
-      const counts = await q.getJobCounts('wait', 'delayed');
-      queuePending.labels(q.name).set((counts.wait || 0) + (counts.delayed || 0));
+      const conteos = await q.getJobCounts('wait', 'delayed');
+      queuePending.labels(q.name).set((conteos.wait || 0) + (conteos.delayed || 0));
     } catch {
       // Redis temporalmente inaccesible — las métricas nunca deben tumbar
       // el worker. La siguiente muestra reintenta.
@@ -109,15 +109,15 @@ async function sampleQueueDepth(queues) {
  *
  * @returns {{ stop: () => Promise<void> }}
  */
-function startQueueDepthCollector(queueNames, connection, intervalMs = 15000) {
-  const queues = queueNames.map((name) => new Queue(name, { connection }));
-  const timer = setInterval(() => sampleQueueDepth(queues), intervalMs);
-  timer.unref(); // las métricas no deben impedir que el proceso termine
-  sampleQueueDepth(queues); // primera muestra inmediata
+function startQueueDepthCollector(queueNames, conexion, intervalMs = 15000) {
+  const colas = queueNames.map((nombre) => new Queue(nombre, { connection: conexion }));
+  const temporizador = setInterval(() => sampleQueueDepth(colas), intervalMs);
+  temporizador.unref(); // las métricas no deben impedir que el proceso termine
+  sampleQueueDepth(colas); // primera muestra inmediata
   return {
     async stop() {
-      clearInterval(timer);
-      await Promise.all(queues.map((q) => q.close()));
+      clearInterval(temporizador);
+      await Promise.all(colas.map((q) => q.close()));
     },
   };
 }

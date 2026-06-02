@@ -11,13 +11,13 @@ const HASH_OPTIONS = {
   parallelism: 1,
 };
 
-async function hashPassword(plaintext) {
-  return argon2.hash(plaintext, HASH_OPTIONS);
+async function hashPassword(textoPlano) {
+  return argon2.hash(textoPlano, HASH_OPTIONS);
 }
 
-async function verifyPassword(hash, plaintext) {
+async function verifyPassword(hash, textoPlano) {
   try {
-    return await argon2.verify(hash, plaintext);
+    return await argon2.verify(hash, textoPlano);
   } catch {
     return false;
   }

@@ -31,12 +31,12 @@ async function idempotency(req, res, next) {
   const bodyHash = hashBody(req.body);
 
   try {
-    const cached = await redis.get(redisKey);
-    if (cached) {
-      const parsed = JSON.parse(cached);
+    const cacheado = await redis.get(redisKey);
+    if (cacheado) {
+      const parseado = JSON.parse(cacheado);
       // El Idempotency-Key se reuso con un body DISTINTO: no servir la
       // respuesta vieja (cache poisoning) ni reprocesar — es error del cliente.
-      if (parsed.bodyHash !== bodyHash) {
+      if (parseado.bodyHash !== bodyHash) {
         logger.warn({ idempotencyKey: key }, 'Idempotency-Key reusado con body distinto');
         return res.status(422).json({
           error: 'IDEMPOTENCY_KEY_REUSED',
@@ -44,14 +44,14 @@ async function idempotency(req, res, next) {
         });
       }
       logger.info({ idempotencyKey: key }, 'Idempotency hit');
-      return res.status(parsed.status).json(parsed.body);
+      return res.status(parseado.status).json(parseado.body);
     }
   } catch (err) {
     logger.error({ err, idempotencyKey: key }, 'Idempotency check failed');
   }
 
   // Interceptar res.json para guardar la respuesta + el hash del body
-  const originalJson = res.json.bind(res);
+  const jsonOriginal = res.json.bind(res);
   res.json = (body) => {
     // Solo cachear respuestas exitosas
     if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -59,7 +59,7 @@ async function idempotency(req, res, next) {
         .set(redisKey, JSON.stringify({ status: res.statusCode, body, bodyHash }), 'EX', TTL, 'NX')
         .catch((err) => logger.error({ err }, 'Failed to cache idempotent response'));
     }
-    return originalJson(body);
+    return jsonOriginal(body);
   };
 
   next();

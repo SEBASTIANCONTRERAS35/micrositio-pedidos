@@ -77,12 +77,12 @@ async function sendWhatsApp(pedido, message, logger) {
 }
 
 function subjectFor(jobName, pedido) {
-  const map = {
+  const mapa = {
     'confirmacion-cliente': `Pedido recibido — ${pedido.pedidoId}`,
     'repartidor-asignado': `Tu pedido va en camino — ${pedido.pedidoId}`,
     entregado: `Pedido entregado — ${pedido.pedidoId}`,
   };
-  return map[jobName] || `Actualizacion de tu pedido ${pedido.pedidoId}`;
+  return mapa[jobName] || `Actualizacion de tu pedido ${pedido.pedidoId}`;
 }
 
 function htmlFor(jobName, pedido) {
@@ -99,10 +99,10 @@ function htmlFor(jobName, pedido) {
 }
 
 function smsFor(jobName, pedido) {
-  const map = {
+  const mapa = {
     'confirmacion-cliente': `Hola ${pedido.cliente.nombre}, tu pedido ${pedido.pedidoId} fue recibido. Total: $${pedido.total.toFixed(2)}.`,
     'repartidor-asignado': `Tu pedido ${pedido.pedidoId} va en camino.${pedido.delivery?.trackingUrl ? ` Rastrear: ${pedido.delivery.trackingUrl}` : ''}`,
     entregado: `Pedido ${pedido.pedidoId} entregado. Gracias!`,
   };
-  return map[jobName] || `Actualizacion de tu pedido ${pedido.pedidoId}`;
+  return mapa[jobName] || `Actualizacion de tu pedido ${pedido.pedidoId}`;
 }

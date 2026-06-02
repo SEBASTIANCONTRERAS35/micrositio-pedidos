@@ -21,14 +21,14 @@ const BASE_URL = process.env.LALAMOVE_BASE_URL || 'https://rest.sandbox.lalamove
  */
 function firmarLalamove(method, path, body = '') {
   const timestamp = Date.now();
-  const rawSignature = `${timestamp}\r\n${method}\r\n${path}\r\n\r\n${body}`;
-  const signature = crypto
+  const firmaCruda = `${timestamp}\r\n${method}\r\n${path}\r\n\r\n${body}`;
+  const firma = crypto
     .createHmac('sha256', process.env.LALAMOVE_API_SECRET)
-    .update(rawSignature)
+    .update(firmaCruda)
     .digest('hex');
   return {
     timestamp,
-    header: `hmac ${process.env.LALAMOVE_API_KEY}:${timestamp}:${signature}`,
+    header: `hmac ${process.env.LALAMOVE_API_KEY}:${timestamp}:${firma}`,
   };
 }
 
@@ -56,7 +56,7 @@ async function requestDelivery(pedido, negocio) {
   });
 
   const { header } = firmarLalamove('POST', '/v3/orders', body);
-  const res = await fetch(`${BASE_URL}/orders`, {
+  const respuesta = await fetch(`${BASE_URL}/orders`, {
     method: 'POST',
     headers: {
       Authorization: header,
@@ -66,16 +66,16 @@ async function requestDelivery(pedido, negocio) {
     body,
   });
 
-  if (!res.ok) {
-    throw new Error(`Lalamove returned ${res.status}: ${await res.text()}`);
+  if (!respuesta.ok) {
+    throw new Error(`Lalamove returned ${respuesta.status}: ${await respuesta.text()}`);
   }
-  const data = await res.json();
+  const datos = await respuesta.json();
 
   return {
-    deliveryId: data.orderId,
-    trackingUrl: data.shareLink,
+    deliveryId: datos.orderId,
+    trackingUrl: datos.shareLink,
     estado: 'pending',
-    costoEnvio: parseFloat(data.priceBreakdown?.total || '35'),
+    costoEnvio: parseFloat(datos.priceBreakdown?.total || '35'),
   };
 }
 
@@ -87,14 +87,14 @@ async function getStatus(deliveryId) {
   // encodeURIComponent: el deliveryId va en la URL — defensa de path.
   const id = encodeURIComponent(deliveryId);
   const { header } = firmarLalamove('GET', `/v3/orders/${id}`);
-  const res = await fetch(`${BASE_URL}/orders/${id}`, {
+  const respuesta = await fetch(`${BASE_URL}/orders/${id}`, {
     headers: { Authorization: header, Market: 'MX' },
   });
-  if (!res.ok) {
-    throw new Error(`Lalamove status returned ${res.status}`);
+  if (!respuesta.ok) {
+    throw new Error(`Lalamove status returned ${respuesta.status}`);
   }
-  const data = await res.json();
-  return { estado: mapEstado(data.status || (data.order && data.order.status)) };
+  const datos = await respuesta.json();
+  return { estado: mapEstado(datos.status || (datos.order && datos.order.status)) };
 }
 
 async function cancelDelivery(deliveryId) {
@@ -104,24 +104,24 @@ async function cancelDelivery(deliveryId) {
   // DELETE /v3/orders/:id — mismo esquema HMAC que requestDelivery.
   const id = encodeURIComponent(deliveryId);
   const { header } = firmarLalamove('DELETE', `/v3/orders/${id}`);
-  const res = await fetch(`${BASE_URL}/orders/${id}`, {
+  const respuesta = await fetch(`${BASE_URL}/orders/${id}`, {
     method: 'DELETE',
     headers: { Authorization: header, Market: 'MX' },
   });
-  return { ok: res.ok };
+  return { ok: respuesta.ok };
 }
 
 function verifyWebhook(body, headers) {
-  const secret = process.env.WEBHOOK_SECRET_LALAMOVE;
-  if (!secret) {
+  const secreto = process.env.WEBHOOK_SECRET_LALAMOVE;
+  if (!secreto) {
     return true;
   } // dev only
-  const signature = headers['x-lalamove-signature'];
-  const timestamp = headers['x-lalamove-timestamp'];
-  if (!isTimestampValid(timestamp)) {
+  const firma = headers['x-lalamove-signature'];
+  const marcaTiempo = headers['x-lalamove-timestamp'];
+  if (!isTimestampValid(marcaTiempo)) {
     return false;
   }
-  return verifyHmacSignature(`${timestamp}.${body}`, signature, secret);
+  return verifyHmacSignature(`${marcaTiempo}.${body}`, firma, secreto);
 }
 
 function parseWebhook(body) {
@@ -135,7 +135,7 @@ function parseWebhook(body) {
 }
 
 function mapEstado(s) {
-  const map = {
+  const mapa = {
     ASSIGNING_DRIVER: 'pending',
     ON_GOING: 'pickup',
     PICKED_UP: 'pickup',
@@ -144,7 +144,7 @@ function mapEstado(s) {
     REJECTED: 'failed',
     EXPIRED: 'failed',
   };
-  return map[s] || 'pending';
+  return mapa[s] || 'pending';
 }
 
 module.exports = { requestDelivery, getStatus, cancelDelivery, verifyWebhook, parseWebhook };

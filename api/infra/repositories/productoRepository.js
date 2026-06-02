@@ -30,7 +30,7 @@ async function buscarActivosPorIds(ids, negocioId) {
  * @returns {Promise<boolean>} true si TODOS los productos se descontaron
  */
 async function descontarStock(snapshot, session) {
-  const result = await Producto.bulkWrite(
+  const resultado = await Producto.bulkWrite(
     snapshot.map((p) => ({
       updateOne: {
         filter: { _id: p.id, stock: { $gte: p.cantidad } },
@@ -39,7 +39,7 @@ async function descontarStock(snapshot, session) {
     })),
     { session }
   );
-  return result.modifiedCount === snapshot.length;
+  return resultado.modifiedCount === snapshot.length;
 }
 
 /**

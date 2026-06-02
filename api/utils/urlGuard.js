@@ -20,11 +20,11 @@ const ALLOW_HTTP = process.env.NODE_ENV !== 'production';
  * Tambien devuelve true si el string no es una IPv4 valida (fail-closed).
  */
 function ipv4InBlockedRange(ip) {
-  const parts = String(ip).split('.').map(Number);
-  if (parts.length !== 4 || parts.some((n) => Number.isNaN(n) || n < 0 || n > 255)) {
+  const octetos = String(ip).split('.').map(Number);
+  if (octetos.length !== 4 || octetos.some((n) => Number.isNaN(n) || n < 0 || n > 255)) {
     return true; // no es IPv4 valida — bloquear por seguridad
   }
-  const [a, b] = parts;
+  const [a, b] = octetos;
   if (a === 127) {
     return true;
   } // loopback
@@ -91,16 +91,16 @@ async function assertSafeUrl(rawUrl) {
   }
 
   // Hostname: resolver DNS y validar TODAS las IPs que devuelva.
-  let ips;
+  let direccionesIp;
   try {
-    ips = await dns.resolve4(host);
+    direccionesIp = await dns.resolve4(host);
   } catch (err) {
     throw new Error(`No se pudo resolver el hostname: ${err.message}`);
   }
-  if (!ips || ips.length === 0) {
+  if (!direccionesIp || direccionesIp.length === 0) {
     throw new Error('El hostname no resuelve a ninguna IP');
   }
-  for (const ip of ips) {
+  for (const ip of direccionesIp) {
     if (ipv4InBlockedRange(ip)) {
       throw new Error(`La URL resuelve a una IP bloqueada: ${ip}`);
     }

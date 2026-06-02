@@ -20,9 +20,9 @@ const PREFIX = 'enc:v1:';
 let _keyWarned = false;
 
 function getKey() {
-  const hex = process.env.ENCRYPTION_KEY;
-  if (hex && /^[0-9a-f]{64}$/i.test(hex)) {
-    return Buffer.from(hex, 'hex');
+  const claveHex = process.env.ENCRYPTION_KEY;
+  if (claveHex && /^[0-9a-f]{64}$/i.test(claveHex)) {
+    return Buffer.from(claveHex, 'hex');
   }
   if (process.env.NODE_ENV === 'production') {
     throw new Error('ENCRYPTION_KEY (64 caracteres hex) es obligatoria en produccion');
@@ -38,15 +38,20 @@ function getKey() {
  * Cifra un secreto. Devuelve el string `enc:v1:...`. Valores vacios/null
  * se devuelven tal cual (no hay nada que cifrar).
  */
-function encryptSecret(plaintext) {
-  if (plaintext === null || plaintext === undefined || plaintext === '') {
-    return plaintext;
+function encryptSecret(textoPlano) {
+  if (textoPlano === null || textoPlano === undefined || textoPlano === '') {
+    return textoPlano;
   }
   const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv(ALGO, getKey(), iv);
-  const ct = Buffer.concat([cipher.update(String(plaintext), 'utf8'), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return PREFIX + iv.toString('hex') + ':' + tag.toString('hex') + ':' + ct.toString('hex');
+  const cifrador = crypto.createCipheriv(ALGO, getKey(), iv);
+  const textoCifrado = Buffer.concat([
+    cifrador.update(String(textoPlano), 'utf8'),
+    cifrador.final(),
+  ]);
+  const tag = cifrador.getAuthTag();
+  return (
+    PREFIX + iv.toString('hex') + ':' + tag.toString('hex') + ':' + textoCifrado.toString('hex')
+  );
 }
 
 /**
@@ -63,10 +68,13 @@ function decryptSecret(value) {
     return value; // legacy en claro
   }
   const [ivHex, tagHex, ctHex] = value.slice(PREFIX.length).split(':');
-  const decipher = crypto.createDecipheriv(ALGO, getKey(), Buffer.from(ivHex, 'hex'));
-  decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
-  const pt = Buffer.concat([decipher.update(Buffer.from(ctHex, 'hex')), decipher.final()]);
-  return pt.toString('utf8');
+  const descifrador = crypto.createDecipheriv(ALGO, getKey(), Buffer.from(ivHex, 'hex'));
+  descifrador.setAuthTag(Buffer.from(tagHex, 'hex'));
+  const textoPlano = Buffer.concat([
+    descifrador.update(Buffer.from(ctHex, 'hex')),
+    descifrador.final(),
+  ]);
+  return textoPlano.toString('utf8');
 }
 
 /** True si el valor ya esta cifrado con este esquema. */

@@ -42,25 +42,25 @@ module.exports = async (job, logger) => {
     // ObjectId (un valor no-ObjectId daría CastError, no inyección).
     const negocio = await Negocio.findById(pedido.negocioId).lean();
 
-    const carrier = carriers[proveedor] || carriers.ivoy;
-    const result = await carrier.requestDelivery(pedido, negocio);
+    const repartidorProveedor = carriers[proveedor] || carriers.ivoy;
+    const resultado = await repartidorProveedor.requestDelivery(pedido, negocio);
 
     // .set() en vez de asignación directa: con schema strict:false un campo
     // NUEVO asignado con "=" no llega al _doc interno de Mongoose y save() lo
     // ignora aunque se llame markModified. .set() sí lo registra.
     pedido.set('delivery', {
       proveedor,
-      deliveryId: result.deliveryId,
-      trackingUrl: result.trackingUrl,
-      estado: result.estado,
-      costoEnvio: result.costoEnvio,
+      deliveryId: resultado.deliveryId,
+      trackingUrl: resultado.trackingUrl,
+      estado: resultado.estado,
+      costoEnvio: resultado.costoEnvio,
       actualizadoEn: new Date(),
     });
     pedido.historial = pedido.historial || [];
     pedido.historial.push({
       estado: 'repartidor_solicitado',
       timestamp: new Date(),
-      nota: `Solicitado a ${proveedor}: ${result.deliveryId}`,
+      nota: `Solicitado a ${proveedor}: ${resultado.deliveryId}`,
     });
     pedido.markModified('historial');
     await pedido.save();
@@ -68,17 +68,17 @@ module.exports = async (job, logger) => {
     // Notificar al cliente
     await colaNotificaciones.add('repartidor-asignado', { pedidoId });
 
-    logger.info({ pedidoId, deliveryId: result.deliveryId, proveedor }, 'Repartidor solicitado');
-    return { ok: true, deliveryId: result.deliveryId };
+    logger.info({ pedidoId, deliveryId: resultado.deliveryId, proveedor }, 'Repartidor solicitado');
+    return { ok: true, deliveryId: resultado.deliveryId };
   }
 
   if (job.name === 'cancelar-repartidor') {
     // El pedido se cancelo y ya tenia repartidor — cancelarlo en el carrier.
     const { deliveryId, proveedor } = job.data;
-    const carrier = carriers[proveedor] || carriers.ivoy;
-    const result = await carrier.cancelDelivery(deliveryId);
-    logger.info({ deliveryId, proveedor, ok: result.ok }, 'Cancelacion de repartidor procesada');
-    return result;
+    const repartidorProveedor = carriers[proveedor] || carriers.ivoy;
+    const resultado = await repartidorProveedor.cancelDelivery(deliveryId);
+    logger.info({ deliveryId, proveedor, ok: resultado.ok }, 'Cancelacion de repartidor procesada');
+    return resultado;
   }
 
   throw new Error(`Job desconocido: ${job.name}`);

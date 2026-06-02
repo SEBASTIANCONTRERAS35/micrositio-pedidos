@@ -5,16 +5,16 @@ const { ValidationError } = require('../utils/errors');
 
 function validate(schema, target = 'body') {
   return (req, res, next) => {
-    const data = req[target];
-    const result = schema.safeParse(data);
-    if (!result.success) {
-      const details = result.error.issues.map((i) => ({
+    const datos = req[target];
+    const resultado = schema.safeParse(datos);
+    if (!resultado.success) {
+      const detalles = resultado.error.issues.map((i) => ({
         path: i.path.join('.'),
         message: i.message,
       }));
-      return next(new ValidationError('Datos invalidos', details));
+      return next(new ValidationError('Datos invalidos', detalles));
     }
-    req[target] = result.data; // datos parseados (con defaults aplicados)
+    req[target] = resultado.data; // datos parseados (con defaults aplicados)
     next();
   };
 }

@@ -10,11 +10,11 @@ const logger = require('../../utils/logger');
 const providers = { ivoy, lalamove, uberDirect };
 
 function getProvider(name) {
-  const provider = providers[name];
-  if (!provider) {
+  const proveedor = providers[name];
+  if (!proveedor) {
     throw new Error(`Provider de delivery desconocido: ${name}`);
   }
-  return provider;
+  return proveedor;
 }
 
 /**
@@ -24,9 +24,9 @@ function getProvider(name) {
  * @returns {object} { deliveryId, trackingUrl, estado, costoEnvio }
  */
 async function requestDelivery(providerName, pedido) {
-  const provider = getProvider(providerName);
+  const proveedor = getProvider(providerName);
   logger.info({ pedidoId: pedido.pedidoId, providerName }, 'Solicitando repartidor');
-  return provider.requestDelivery(pedido);
+  return proveedor.requestDelivery(pedido);
 }
 
 async function getStatus(providerName, deliveryId) {

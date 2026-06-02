@@ -46,13 +46,13 @@ router.post(
       const rawBody = req.body.toString('utf8');
 
       // Verificar firma
-      const valid = delivery.verifyWebhook(provider, rawBody, req.headers);
-      if (!valid) {
+      const valida = delivery.verifyWebhook(provider, rawBody, req.headers);
+      if (!valida) {
         throw new WebhookSignatureError();
       }
 
-      const parsed = JSON.parse(rawBody);
-      const event = delivery.parseWebhook(provider, parsed);
+      const parseado = JSON.parse(rawBody);
+      const event = delivery.parseWebhook(provider, parseado);
 
       // Idempotencia: por deliveryId + estado evitamos procesar dos veces
       // (el job en el worker hara el manejo final)

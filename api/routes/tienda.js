@@ -18,9 +18,9 @@ router.get('/:slug', async (req, res) => {
   const slug = req.params.slug;
 
   // Cache local (TTL largo: ZUYU manda webhooks para invalidar)
-  const cached = tiendaCache.get(slug);
-  if (cached) {
-    return res.render('tienda/index', cached);
+  const cacheado = tiendaCache.get(slug);
+  if (cacheado) {
+    return res.render('tienda/index', cacheado);
   }
 
   // Fuente de verdad: ZUYU (en mock = mongo local). getCatalogo ya devuelve
