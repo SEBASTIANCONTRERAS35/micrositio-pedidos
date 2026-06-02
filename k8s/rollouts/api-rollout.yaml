@@ -17,8 +17,12 @@ spec:
       app: api
   strategy:
     canary:
-      maxSurge: 1
-      maxUnavailable: 0
+      # maxSurge:0 -> el rollout BORRA antes de CREAR (no apila pods nuevos en un
+      # nodo mientras los viejos balancean). Así cada pod nuevo respeta el
+      # topologySpread y queda SIEMPRE 1-por-nodo (necesario para
+      # internalTrafficPolicy:Local). Costo: ventana breve de 1 pod por paso.
+      maxSurge: 0
+      maxUnavailable: 1
       steps:
         - setWeight: 10
         - pause: { duration: 2m }
