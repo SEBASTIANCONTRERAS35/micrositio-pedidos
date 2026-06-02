@@ -50,6 +50,10 @@ spec:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: DoNotSchedule
+          # Excluye del cálculo de skew los nodos con taints no tolerados (el
+          # master control-plane). Sin esto, el master cuenta como dominio en 0
+          # y el pod surge del canary viola maxSkew:1 -> queda Pending.
+          nodeTaintsPolicy: Honor
           labelSelector:
             matchLabels:
               app: api
