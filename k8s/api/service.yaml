@@ -7,6 +7,12 @@ metadata:
     app: api
 spec:
   type: ClusterIP
+  # Mantiene el tráfico del ingress en el MISMO nodo: ingress-nginx corre en
+  # hostNetwork, así que cross-nodo saldría con la IP de túnel VXLAN y la
+  # NetworkPolicy lo bloquearía. Con Local, kube-proxy solo enruta al pod api
+  # del nodo local (requiere 1 pod api por nodo -> topologySpreadConstraints
+  # en el Rollout). Combinar con annotation service-upstream en el Ingress.
+  internalTrafficPolicy: Local
   selector:
     app: api
   ports:
