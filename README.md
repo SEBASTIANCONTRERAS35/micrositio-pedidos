@@ -288,6 +288,20 @@ helm install ingress-nginx ingress-nginx/ingress-nginx \
 helm install keda kedacore/keda -n keda --create-namespace --version 2.15.2
 ```
 
+> KEDA escala el worker por la cola Redis (métrica externa, no necesita metrics-server).
+
+### 9.5. metrics-server (para `kubectl top` y el HPA por CPU del API)
+
+```bash
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.7.2/components.yaml
+# kubeadm usa certs de kubelet self-signed -> metrics-server necesita este flag:
+kubectl patch deployment metrics-server -n kube-system --type=json \
+  -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+kubectl rollout status deployment metrics-server -n kube-system --timeout=120s
+# Verificar:
+kubectl top nodes
+```
+
 ### 10. Stack de observabilidad
 
 ```bash
