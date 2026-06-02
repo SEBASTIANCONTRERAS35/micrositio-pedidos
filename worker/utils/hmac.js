@@ -16,19 +16,22 @@ function verifyHmacSignature(body, signature, secret) {
     return false;
   }
 
-  const cleanSignature = signature.replace(/^sha256=/, '');
+  const firmaLimpia = signature.replace(/^sha256=/, '');
 
-  const computed = crypto
+  const firmaCalculada = crypto
     .createHmac('sha256', secret)
     .update(typeof body === 'string' ? body : body.toString('utf8'))
     .digest('hex');
 
-  if (computed.length !== cleanSignature.length) {
+  if (firmaCalculada.length !== firmaLimpia.length) {
     return false;
   }
 
   try {
-    return crypto.timingSafeEqual(Buffer.from(computed, 'hex'), Buffer.from(cleanSignature, 'hex'));
+    return crypto.timingSafeEqual(
+      Buffer.from(firmaCalculada, 'hex'),
+      Buffer.from(firmaLimpia, 'hex')
+    );
   } catch {
     return false;
   }
@@ -41,13 +44,13 @@ function verifyHmacSignature(body, signature, secret) {
  * @returns {boolean}
  */
 function isTimestampValid(timestamp, toleranceSeconds = 300) {
-  const ts = parseInt(timestamp, 10);
-  if (isNaN(ts)) {
+  const tsNumerico = parseInt(timestamp, 10);
+  if (isNaN(tsNumerico)) {
     return false;
   }
 
-  const now = Math.floor(Date.now() / 1000);
-  return Math.abs(now - ts) <= toleranceSeconds;
+  const ahora = Math.floor(Date.now() / 1000);
+  return Math.abs(ahora - tsNumerico) <= toleranceSeconds;
 }
 
 /**

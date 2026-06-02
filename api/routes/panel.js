@@ -87,9 +87,9 @@ router.put('/api/integracion', requireAuth, validate(IntegracionSchema), async (
     }
 
     if (apiKey) {
-      const key = String(apiKey).trim();
-      zc.apiKey = encryptSecret(key); // cifrado at-rest (AES-256-GCM)
-      zc.apiKeyPrefix = key.slice(0, 12); // prefijo en claro — no es secreto
+      const clave = String(apiKey).trim();
+      zc.apiKey = encryptSecret(clave); // cifrado at-rest (AES-256-GCM)
+      zc.apiKeyPrefix = clave.slice(0, 12); // prefijo en claro — no es secreto
     }
 
     if (webhookSecret) {

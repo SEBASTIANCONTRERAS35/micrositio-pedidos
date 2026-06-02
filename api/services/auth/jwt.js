@@ -97,8 +97,8 @@ async function isAccessTokenRevoked(jti) {
   if (!jti) {
     return false;
   }
-  const exists = await redis.exists(`revoked:${jti}`);
-  return exists === 1;
+  const existe = await redis.exists(`revoked:${jti}`);
+  return existe === 1;
 }
 
 /**

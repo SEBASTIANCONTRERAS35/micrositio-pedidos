@@ -15,7 +15,7 @@ router.get('/live', (req, res) => {
 });
 
 router.get('/ready', async (req, res) => {
-  const checks = {
+  const chequeos = {
     mongo: false,
     redis: false,
   };
@@ -23,21 +23,21 @@ router.get('/ready', async (req, res) => {
   try {
     if (mongoose.connection.readyState === 1) {
       await mongoose.connection.db.admin().ping();
-      checks.mongo = true;
+      chequeos.mongo = true;
     }
   } catch (e) {
-    checks.mongo = false;
+    chequeos.mongo = false;
   }
 
   try {
-    const pong = await redis.ping();
-    checks.redis = pong === 'PONG';
+    const respuestaPing = await redis.ping();
+    chequeos.redis = respuestaPing === 'PONG';
   } catch (e) {
-    checks.redis = false;
+    chequeos.redis = false;
   }
 
-  const ready = checks.mongo && checks.redis;
-  res.status(ready ? 200 : 503).json({ status: ready ? 'ready' : 'not_ready', checks });
+  const listo = chequeos.mongo && chequeos.redis;
+  res.status(listo ? 200 : 503).json({ status: listo ? 'ready' : 'not_ready', checks: chequeos });
 });
 
 router.get('/startup', (req, res) => {

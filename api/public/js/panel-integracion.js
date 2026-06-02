@@ -44,14 +44,14 @@ function integracionZuyu() {
         }
 
         // Estado de la integracion
-        const res = await fetch('/panel/api/integracion', {
+        const respuesta = await fetch('/panel/api/integracion', {
           headers: { Authorization: 'Bearer ' + t },
         });
-        if (res.ok) {
-          const data = await res.json();
-          this.estado = data;
-          this.form.baseUrl = data.baseUrl || '';
-          this.form.conectado = data.conectado || false;
+        if (respuesta.ok) {
+          const datos = await respuesta.json();
+          this.estado = datos;
+          this.form.baseUrl = datos.baseUrl || '';
+          this.form.conectado = datos.conectado || false;
         }
       } catch (e) {
         this.msg = 'No se pudo cargar la configuración.';
@@ -78,7 +78,7 @@ function integracionZuyu() {
           payload.webhookSecret = this.form.webhookSecret.trim();
         }
 
-        const res = await fetch('/panel/api/integracion', {
+        const respuesta = await fetch('/panel/api/integracion', {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -86,17 +86,17 @@ function integracionZuyu() {
           },
           body: JSON.stringify(payload),
         });
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.message || 'No se pudo guardar');
+        const datos = await respuesta.json();
+        if (!respuesta.ok) {
+          throw new Error(datos.message || 'No se pudo guardar');
         }
         // Refrescar estado y limpiar los campos de secreto
-        this.estado = data;
-        this.form.baseUrl = data.baseUrl || '';
-        this.form.conectado = data.conectado || false;
+        this.estado = datos;
+        this.form.baseUrl = datos.baseUrl || '';
+        this.form.conectado = datos.conectado || false;
         this.form.apiKey = '';
         this.form.webhookSecret = '';
-        this.msg = data.conectado
+        this.msg = datos.conectado
           ? 'Guardado. El micrositio está conectado a ZUYU.'
           : 'Guardado. El micrositio está en modo demo.';
         this.msgOk = true;

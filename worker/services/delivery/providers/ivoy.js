@@ -16,15 +16,15 @@ async function requestDelivery(pedido, negocio) {
   }
 
   // Llamada real al sandbox de iVoy
-  const auth = Buffer.from(`${process.env.IVOY_USER}:${process.env.IVOY_PASSWORD}`).toString(
+  const credencial = Buffer.from(`${process.env.IVOY_USER}:${process.env.IVOY_PASSWORD}`).toString(
     'base64'
   );
   const origen = construirOrigenEnvio(negocio);
 
-  const res = await fetch(`${BASE_URL}/express/orders`, {
+  const respuesta = await fetch(`${BASE_URL}/express/orders`, {
     method: 'POST',
     headers: {
-      Authorization: `Basic ${auth}`,
+      Authorization: `Basic ${credencial}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -42,16 +42,16 @@ async function requestDelivery(pedido, negocio) {
     }),
   });
 
-  if (!res.ok) {
-    throw new Error(`iVoy returned ${res.status}: ${await res.text()}`);
+  if (!respuesta.ok) {
+    throw new Error(`iVoy returned ${respuesta.status}: ${await respuesta.text()}`);
   }
 
-  const data = await res.json();
+  const datos = await respuesta.json();
   return {
-    deliveryId: data.id || data.orderId,
-    trackingUrl: data.trackingUrl,
+    deliveryId: datos.id || datos.orderId,
+    trackingUrl: datos.trackingUrl,
     estado: 'pending',
-    costoEnvio: data.cost || 49,
+    costoEnvio: datos.cost || 49,
   };
 }
 
@@ -60,19 +60,19 @@ async function getStatus(deliveryId) {
     return { estado: 'pickup' };
   }
 
-  const auth = Buffer.from(`${process.env.IVOY_USER}:${process.env.IVOY_PASSWORD}`).toString(
+  const credencial = Buffer.from(`${process.env.IVOY_USER}:${process.env.IVOY_PASSWORD}`).toString(
     'base64'
   );
 
-  const res = await fetch(`${BASE_URL}/express/orders/${deliveryId}`, {
-    headers: { Authorization: `Basic ${auth}` },
+  const respuesta = await fetch(`${BASE_URL}/express/orders/${deliveryId}`, {
+    headers: { Authorization: `Basic ${credencial}` },
   });
 
-  if (!res.ok) {
-    throw new Error(`iVoy status returned ${res.status}`);
+  if (!respuesta.ok) {
+    throw new Error(`iVoy status returned ${respuesta.status}`);
   }
-  const data = await res.json();
-  return { estado: mapEstado(data.status) };
+  const datos = await respuesta.json();
+  return { estado: mapEstado(datos.status) };
 }
 
 async function cancelDelivery(deliveryId) {
@@ -82,15 +82,18 @@ async function cancelDelivery(deliveryId) {
   // iVoy Express: cancelación de una orden. Si el sandbox no expone el
   // endpoint (404/405/501), devolvemos ok:false con el status real — el
   // caller decide, sin asumir éxito ciego. encodeURIComponent: defensa de path.
-  const auth = Buffer.from(`${process.env.IVOY_USER}:${process.env.IVOY_PASSWORD}`).toString(
+  const credencial = Buffer.from(`${process.env.IVOY_USER}:${process.env.IVOY_PASSWORD}`).toString(
     'base64'
   );
-  const res = await fetch(`${BASE_URL}/express/orders/${encodeURIComponent(deliveryId)}/cancel`, {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}` },
-  });
-  if (!res.ok) {
-    return { ok: false, reason: `iVoy cancel respondió ${res.status}` };
+  const respuesta = await fetch(
+    `${BASE_URL}/express/orders/${encodeURIComponent(deliveryId)}/cancel`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Basic ${credencial}` },
+    }
+  );
+  if (!respuesta.ok) {
+    return { ok: false, reason: `iVoy cancel respondió ${respuesta.status}` };
   }
   return { ok: true };
 }
@@ -100,19 +103,19 @@ async function cancelDelivery(deliveryId) {
  * Para el proyecto universitario aceptamos un token compartido en header.
  */
 function verifyWebhook(body, headers) {
-  const secret = process.env.WEBHOOK_SECRET_IVOY;
-  if (!secret) {
+  const secreto = process.env.WEBHOOK_SECRET_IVOY;
+  if (!secreto) {
     logger.warn('WEBHOOK_SECRET_IVOY no configurado, webhooks no verificados');
     return true; // dev only
   }
 
-  const signature = headers['x-ivoy-signature'];
-  const timestamp = headers['x-ivoy-timestamp'];
+  const firma = headers['x-ivoy-signature'];
+  const marcaTiempo = headers['x-ivoy-timestamp'];
 
-  if (!isTimestampValid(timestamp)) {
+  if (!isTimestampValid(marcaTiempo)) {
     return false;
   }
-  return verifyHmacSignature(body, signature, secret);
+  return verifyHmacSignature(body, firma, secreto);
 }
 
 function parseWebhook(body) {
@@ -124,7 +127,7 @@ function parseWebhook(body) {
 }
 
 function mapEstado(ivoyStatus) {
-  const map = {
+  const mapa = {
     accepted: 'pending',
     picking_up: 'pickup',
     in_transit: 'pickup',
@@ -132,7 +135,7 @@ function mapEstado(ivoyStatus) {
     cancelled: 'cancelled',
     failed: 'failed',
   };
-  return map[ivoyStatus] || 'pending';
+  return mapa[ivoyStatus] || 'pending';
 }
 
 function mockResponse(pedido) {

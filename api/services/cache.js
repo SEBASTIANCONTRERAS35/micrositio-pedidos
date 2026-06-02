@@ -10,15 +10,15 @@ class TTLCache {
   }
 
   get(key) {
-    const entry = this.cache.get(key);
-    if (!entry) {
+    const entrada = this.cache.get(key);
+    if (!entrada) {
       return null;
     }
-    if (Date.now() > entry.expiresAt) {
+    if (Date.now() > entrada.expiresAt) {
       this.cache.delete(key);
       return null;
     }
-    return entry.value;
+    return entrada.value;
   }
 
   set(key, value, ttlMs = null) {

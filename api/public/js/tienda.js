@@ -40,10 +40,10 @@ function cartStore(slug) {
       this.showToast(prod.nombre);
     },
     addToCart(prod) {
-      const existing = this.items.find((i) => i.id === prod.id);
-      if (existing) {
-        if (existing.cantidad < prod.stock) {
-          existing.cantidad += 1;
+      const existente = this.items.find((i) => i.id === prod.id);
+      if (existente) {
+        if (existente.cantidad < prod.stock) {
+          existente.cantidad += 1;
         }
       } else {
         this.items.push({ ...prod, cantidad: 1 });

@@ -39,13 +39,13 @@ const pedidosTotal = new promClient.Counter({
 
 // Middleware Express — mide cada request
 function middleware(req, res, next) {
-  const start = process.hrtime.bigint();
+  const inicio = process.hrtime.bigint();
   res.on('finish', () => {
     const route = req.route?.path || req.path.replace(/\/[a-f0-9-]{8,}/g, '/:id') || 'unknown';
     const status = String(res.statusCode);
-    const dur = Number(process.hrtime.bigint() - start) / 1e9;
+    const duracion = Number(process.hrtime.bigint() - inicio) / 1e9;
     httpRequests.labels(req.method, route, status).inc();
-    httpDuration.labels(req.method, route, status).observe(dur);
+    httpDuration.labels(req.method, route, status).observe(duracion);
   });
   next();
 }

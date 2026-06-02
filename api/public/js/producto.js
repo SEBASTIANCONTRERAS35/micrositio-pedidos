@@ -18,9 +18,9 @@ function productoView(slug) {
       }
       const items = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
       const qty = Math.max(1, Math.min(Number(this.cantidad) || 1, prod.stock));
-      const existing = items.find((i) => i.id === prod.id);
-      if (existing) {
-        existing.cantidad = Math.min(existing.cantidad + qty, prod.stock);
+      const existente = items.find((i) => i.id === prod.id);
+      if (existente) {
+        existente.cantidad = Math.min(existente.cantidad + qty, prod.stock);
       } else {
         items.push({ ...prod, cantidad: qty });
       }
