@@ -10,9 +10,28 @@
 const mongoose = require('mongoose');
 const Producto = require('../../models/producto');
 
-/** Busca los productos activos de un negocio por sus ids (strings). */
+/**
+ * Filtra una lista de ids dejando solo los que son ObjectId de Mongo válidos,
+ * convertidos a ObjectId. Los inválidos (ej. SKUs de ZUYU como 'AVI-250' si el
+ * carrito quedó con datos de otro modo) se DESCARTAN en vez de tronar con
+ * BSONError. Pura y testeable (no toca BD).
+ */
+function idsObjectIdValidos(ids) {
+  return (ids || [])
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+}
+
+/**
+ * Busca los productos activos de un negocio por sus ids (strings).
+ * Usa idsObjectIdValidos: un id inválido no matchea → el service lo reporta
+ * como "no encontrado" y responde 404 limpio, NUNCA un 500 por BSONError.
+ */
 async function buscarActivosPorIds(ids, negocioId) {
-  const objectIds = ids.map((id) => new mongoose.Types.ObjectId(id));
+  const objectIds = idsObjectIdValidos(ids);
+  if (objectIds.length === 0) {
+    return [];
+  }
   return Producto.find({
     _id: { $in: objectIds },
     negocioId,
@@ -61,4 +80,4 @@ async function devolverStock(productos, session) {
   );
 }
 
-module.exports = { buscarActivosPorIds, descontarStock, devolverStock };
+module.exports = { buscarActivosPorIds, descontarStock, devolverStock, idsObjectIdValidos };
