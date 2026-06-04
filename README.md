@@ -1,6 +1,6 @@
 # Micrositio de Pedidos y Delivery
 
-> Proyecto Final · Introducción a DevOps
+> Proyecto Final · Materia: Introducción a DevOps
 > **Autor:** Sebastián Contreras · **Profesor:** Daniel Guerrero
 > **Entrega:** 5 de junio 2026
 
@@ -540,5 +540,5 @@ Ver `docs/adr/` para los ADRs completos. Resumen:
 
 ## Créditos y licencia
 
-Proyecto académico bajo el Introducción a DevOps.
+Proyecto académico de la materia Introducción a DevOps.
 Código MIT. Datos generados son sintéticos.
