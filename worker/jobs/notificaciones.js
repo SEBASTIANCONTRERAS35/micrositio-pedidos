@@ -1,16 +1,12 @@
 const mongoose = require('mongoose');
 const { Resend } = require('resend');
-const twilio = require('twilio');
 
 const pedidoSchema = new mongoose.Schema({}, { strict: false, collection: 'pedidos' });
 const Pedido = mongoose.models.Pedido || mongoose.model('Pedido', pedidoSchema);
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const twilioClient = process.env.TWILIO_ACCOUNT_SID
-  ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
-  : null;
 
-// Procesa el job y envia email y WhatsApp al cliente del pedido.
+// Procesa el job y envia el email de notificacion al cliente del pedido.
 module.exports = async (job, logger) => {
   const { pedidoId } = job.data;
   const pedido = await Pedido.findOne({ pedidoId }).lean();
@@ -20,12 +16,8 @@ module.exports = async (job, logger) => {
 
   const subject = subjectFor(job.name, pedido);
   const html = htmlFor(job.name, pedido);
-  const sms = smsFor(job.name, pedido);
 
-  await Promise.allSettled([
-    sendEmail(pedido, subject, html, logger),
-    sendWhatsApp(pedido, sms, logger),
-  ]);
+  await sendEmail(pedido, subject, html, logger);
 
   return { ok: true };
 };
@@ -52,24 +44,6 @@ async function sendEmail(pedido, subject, html, logger) {
   }
 }
 
-// Envia el mensaje de WhatsApp del pedido via Twilio si esta configurado.
-async function sendWhatsApp(pedido, message, logger) {
-  if (!twilioClient || !pedido.cliente?.telefono) {
-    logger.warn({ pedidoId: pedido.pedidoId }, 'WhatsApp no enviado (Twilio no configurado)');
-    return;
-  }
-  try {
-    await twilioClient.messages.create({
-      from: process.env.TWILIO_WHATSAPP_FROM,
-      to: `whatsapp:${pedido.cliente.telefono}`,
-      body: message,
-    });
-    logger.info({ pedidoId: pedido.pedidoId }, 'WhatsApp enviado');
-  } catch (e) {
-    logger.error({ err: e, pedidoId: pedido.pedidoId }, 'Error al enviar WhatsApp');
-  }
-}
-
 // Devuelve el asunto del email segun el tipo de job.
 function subjectFor(jobName, pedido) {
   const mapa = {
@@ -88,18 +62,8 @@ function htmlFor(jobName, pedido) {
   `;
   const cuerpo = {
     'confirmacion-cliente': `<p>Hemos recibido tu pedido por <strong>$${pedido.total.toFixed(2)}</strong>. Te avisaremos cuando este confirmado.</p>`,
-    'repartidor-asignado': `<p>Tu pedido va en camino.${pedido.delivery?.trackingUrl ? ` <a href="${pedido.delivery.trackingUrl}">Rastrear</a>` : ''}</p>`,
+    'repartidor-asignado': `<p>Tu pedido va en camino.</p>`,
     entregado: `<p>Tu pedido fue entregado. Gracias por tu compra!</p>`,
   };
   return base + (cuerpo[jobName] || '');
-}
-
-// Construye el texto del SMS/WhatsApp segun el tipo de job.
-function smsFor(jobName, pedido) {
-  const mapa = {
-    'confirmacion-cliente': `Hola ${pedido.cliente.nombre}, tu pedido ${pedido.pedidoId} fue recibido. Total: $${pedido.total.toFixed(2)}.`,
-    'repartidor-asignado': `Tu pedido ${pedido.pedidoId} va en camino.${pedido.delivery?.trackingUrl ? ` Rastrear: ${pedido.delivery.trackingUrl}` : ''}`,
-    entregado: `Pedido ${pedido.pedidoId} entregado. Gracias!`,
-  };
-  return mapa[jobName] || `Actualizacion de tu pedido ${pedido.pedidoId}`;
 }

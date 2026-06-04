@@ -159,7 +159,9 @@
               <p class="pedido-detalle__total" x-text="'Total: $' + selected.total.toFixed(2)"></p>
             </div>
 
-            <template x-if="selected.delivery && (selected.delivery.proveedor || selected.delivery.trackingUrl || (selected.delivery.repartidor && (selected.delivery.repartidor.nombre || selected.delivery.repartidor.telefono)))">
+            <template
+              x-if="selected.delivery && (selected.delivery.proveedor || selected.delivery.trackingUrl || (selected.delivery.repartidor && (selected.delivery.repartidor.nombre || selected.delivery.repartidor.telefono)))"
+            >
               <div class="pedido-detalle__section">
                 <h3>Tracking del repartidor</h3>
                 <p x-show="selected.delivery.proveedor">
@@ -174,14 +176,6 @@
                     :href="'tel:' + (selected.delivery.repartidor ? selected.delivery.repartidor.telefono : '')"
                     x-text="selected.delivery.repartidor ? selected.delivery.repartidor.telefono : ''"
                   ></a>
-                </p>
-                <p x-show="selected.delivery.trackingUrl">
-                  <a
-                    :href="trackUrlSeguro(selected.delivery.trackingUrl)"
-                    target="_blank"
-                    rel="noopener"
-                    >Ver en vivo →</a
-                  >
                 </p>
               </div>
             </template>

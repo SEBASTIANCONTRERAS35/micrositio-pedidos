@@ -318,8 +318,28 @@ helm install kps prometheus-community/kube-prometheus-stack \
 ### 11. Tekton + Registry local + builds iniciales
 
 ```bash
-# Registry local (NodePort 30500)
-kubectl apply -f k8s/registry/
+# Registry local (registry:2 en NodePort 30500)
+kubectl apply -f - <<'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: registry, namespace: kube-system, labels: { app: registry } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: registry } }
+  template:
+    metadata: { labels: { app: registry } }
+    spec:
+      containers:
+        - { name: registry, image: registry:2, ports: [{ containerPort: 5000 }] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: registry, namespace: kube-system }
+spec:
+  type: NodePort
+  selector: { app: registry }
+  ports: [{ port: 5000, targetPort: 5000, nodePort: 30500 }]
+EOF
 
 # Configurar containerd en CADA nodo para trust registry insecure
 sudo mkdir -p /etc/containerd/certs.d/<MASTER-IP>:30500
@@ -336,9 +356,8 @@ sudo systemctl restart containerd
 kubectl apply -f https://storage.googleapis.com/tekton-releases/pipeline/previous/v0.65.0/release.yaml
 kubectl apply -f tekton/
 
-# Disparar primer build api + worker
-kubectl create -f tekton/pipelinerun-api.yaml
-kubectl create -f tekton/pipelinerun-worker.yaml
+# Disparar el primer build (api + worker en un solo pipeline)
+kubectl create -f tekton/pipelinerun-example.yaml
 ```
 
 ### 12. ArgoCD + Argo Rollouts
@@ -461,7 +480,6 @@ kubectl get app micrositio -n argocd
 ```bash
 git clone git@github.com:SEBASTIANCONTRERAS35/micrositio-pedidos.git
 cd micrositio-pedidos
-# crea tu archivo .env con las variables que usa docker-compose.yml
 
 docker compose up -d
 docker compose logs -f api

@@ -116,7 +116,7 @@
     el.classList.toggle('is-oculto', !mostrar);
   }
 
-  // Muestra/actualiza los datos del repartidor y el boton de tracking en vivo.
+  // Muestra/actualiza el nombre del repartidor asignado.
   function pintarRepartidor(delivery) {
     const cont = document.querySelector('[data-tracking-delivery]');
     if (!cont) {
@@ -124,10 +124,8 @@
     }
     const repartidor = delivery && delivery.repartidor;
     const tieneRepartidor = repartidor && repartidor.nombre;
-    const rawUrl = delivery && delivery.trackingUrl;
-    const trackingUrl = rawUrl && /^https?:\/\//i.test(rawUrl) ? rawUrl : null;
 
-    if (!tieneRepartidor && !trackingUrl) {
+    if (!tieneRepartidor) {
       toggleOculto(cont, false);
       return;
     }
@@ -135,17 +133,7 @@
 
     const nombreEl = cont.querySelector('[data-tracking-repartidor-nombre]');
     if (nombreEl) {
-      nombreEl.textContent = (repartidor && repartidor.nombre) || 'Repartidor asignado';
-    }
-
-    const btn = cont.querySelector('[data-tracking-url]');
-    if (btn) {
-      if (trackingUrl) {
-        btn.href = trackingUrl;
-        toggleOculto(btn, true);
-      } else {
-        toggleOculto(btn, false);
-      }
+      nombreEl.textContent = repartidor.nombre || 'Repartidor asignado';
     }
   }
 

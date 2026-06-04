@@ -26,8 +26,7 @@
         <span class="confirmacion-id"><%= pedido.pedidoId %></span>
         <p class="confirmacion-msg">
           <strong><%= negocio.nombre %></strong> recibira tu pedido en breve. Te avisaremos por
-          email <% if (pedido.cliente.telefono) { %>y WhatsApp<% } %> cuando este confirmado y
-          cuando un repartidor este en camino.
+          email cuando este confirmado y cuando un repartidor este en camino.
         </p>
 
         <div class="confirmacion-detalles">
@@ -51,10 +50,7 @@
         'Entregado', cancelado: 'Cancelado', }; const indiceActual = ETAPAS.indexOf(pedido.estado);
         const delivery = pedido.delivery || null; const repartidor = delivery && delivery.repartidor
         ? delivery.repartidor : null; const tieneRepartidor = !!(repartidor && repartidor.nombre);
-        const trackingUrl = delivery && /^https?:\/\//i.test(delivery.trackingUrl || '') ?
-        delivery.trackingUrl : null; const claseDelivery = 'tracking-delivery' + (!tieneRepartidor &&
-        !trackingUrl ? ' is-oculto' : ''); const claseTracking = 'tracking-delivery__btn' +
-        (trackingUrl ? '' : ' is-oculto'); %>
+        const claseDelivery = 'tracking-delivery' + (!tieneRepartidor ? ' is-oculto' : ''); %>
 
         <div class="confirmacion-seguimiento">
           <h3>Seguimiento</h3>
@@ -94,14 +90,6 @@
             <p class="tracking-delivery__nombre" data-tracking-repartidor-nombre>
               <%= (repartidor && repartidor.nombre) ? repartidor.nombre : 'Repartidor asignado' %>
             </p>
-            <a
-              class="<%= claseTracking %>"
-              data-tracking-url
-              href="<%= trackingUrl || '#' %>"
-              target="_blank"
-              rel="noopener"
-              >Rastrear en vivo →</a
-            >
           </div>
         </div>
 
