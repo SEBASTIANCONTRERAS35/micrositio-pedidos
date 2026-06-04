@@ -20,6 +20,8 @@ const colaNotificaciones = new Queue('notificaciones', {
     port: parseInt(process.env.REDIS_PORT || '6379', 10),
     password: process.env.REDIS_PASSWORD,
   },
+  // Limpieza automática: no acumular jobs terminados en Redis.
+  defaultJobOptions: { removeOnComplete: 1000, removeOnFail: 5000 },
 });
 
 // Carriers (mock o real) — copia local en worker/services/delivery/
