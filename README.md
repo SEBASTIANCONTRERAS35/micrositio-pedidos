@@ -16,7 +16,6 @@ a domicilio, sin pagar comisiones a marketplaces. Cada negocio obtiene su propia
 - [Stack tecnológico](#stack-tecnológico)
 - [Estructura del repositorio](#estructura-del-repositorio)
 - [Despliegue completo en cluster bare-metal](#despliegue-completo-en-cluster-bare-metal)
-- [Las 8 demos para la defensa](#las-8-demos-para-la-defensa)
 - [Desarrollo local (Docker Compose)](#desarrollo-local-docker-compose)
 - [Troubleshooting](#troubleshooting)
 - [Decisiones arquitectónicas](#decisiones-arquitectónicas)
@@ -120,9 +119,7 @@ micrositio-pedidos/
 ├── argocd/
 │   └── application.yaml          Application apuntando a k8s/
 ├── monitoring/                   Helm values (Loki / Alloy / Prometheus)
-├── docs/adr/                     Architecture Decision Records
-├── docker-compose.yml            Dev local (NO para defensa)
-└── .env.example
+└── docker-compose.yml            Dev local (NO para defensa)
 ```
 
 ---
@@ -457,35 +454,6 @@ kubectl get app micrositio -n argocd
 
 ---
 
-## Las 8 demos para la defensa
-
-> Cada demo en `demos/demo-N-<nombre>.sh`. Total 20 min. Ordenadas según rubrica de Daniel Guerrero.
-
-| #   | Demo                                      | Duración | Pts en juego        |
-| --- | ----------------------------------------- | -------- | ------------------- |
-| 1   | Flujo de pedido end-to-end                | 4 min    | 5 (App funcional)   |
-| 2   | MongoDB Replica Set + matar PRIMARY       | 2 min    | 15 (MongoDB RS)     |
-| 3   | NetworkPolicy bloqueando pod rogue        | 2 min    | 15 (NetworkPolicy)  |
-| 4   | KEDA: scale-up 1→5 + scale-down           | 3 min    | 15 (KEDA)           |
-| 5   | CI/CD: git push → Tekton → ArgoCD         | 3 min    | 15 (CI/CD)          |
-| 6   | Canary 10% → 50% → 100% (Argo Rollouts)   | 2 min    | 10 (Canary)         |
-| 7   | Búsqueda de pedido por `pedidoId` en Loki | 2 min    | 10 (Observabilidad) |
-| 8   | Q&A                                       | 2 min    | —                   |
-
-Demos implícitas que también hay que tener listas (Daniel puede pedirlas):
-
-- Ingress + TLS (candado verde en `zuyu.local`)
-- ResourceQuota (pod rechazado por exceso)
-- AnalysisTemplate (rollback automático por error rate, bonus +3)
-
-Correr cualquiera:
-
-```bash
-bash demos/demo-1-pedido-e2e.sh
-```
-
----
-
 ## Desarrollo local (Docker Compose)
 
 > Solo para desarrollo. La defensa se hace contra el cluster K8s real.
@@ -493,7 +461,7 @@ bash demos/demo-1-pedido-e2e.sh
 ```bash
 git clone git@github.com:SEBASTIANCONTRERAS35/micrositio-pedidos.git
 cd micrositio-pedidos
-cp .env.example .env  # editar con valores reales
+# crea tu archivo .env con las variables que usa docker-compose.yml
 
 docker compose up -d
 docker compose logs -f api
@@ -528,7 +496,7 @@ npm run test:integration  # integration (requiere mongo+redis vía testcontainer
 
 ## Decisiones arquitectónicas
 
-Ver `docs/adr/` para los ADRs completos. Resumen:
+Resumen de decisiones:
 
 - **ADR-001:** Calico VXLAN (no Flannel) — NetworkPolicy completa requerida por rúbrica
 - **ADR-002:** NFS para MongoDB es deuda técnica aceptable — demo OK, prod requeriría block storage
