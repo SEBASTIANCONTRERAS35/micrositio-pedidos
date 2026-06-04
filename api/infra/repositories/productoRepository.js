@@ -1,32 +1,16 @@
-/**
- * Repositorio de Productos — aisla el acceso Mongoose. El service y el
- * dominio hablan con esta interfaz, no con el modelo directamente.
- *
- * Las operaciones de stock aceptan una `session` para poder participar en
- * la transaccion atomica que orquesta el service.
- */
 'use strict';
 
 const mongoose = require('mongoose');
 const Producto = require('../../models/producto');
 
-/**
- * Filtra una lista de ids dejando solo los que son ObjectId de Mongo válidos,
- * convertidos a ObjectId. Los inválidos (ej. SKUs de ZUYU como 'AVI-250' si el
- * carrito quedó con datos de otro modo) se DESCARTAN en vez de tronar con
- * BSONError. Pura y testeable (no toca BD).
- */
+// Filtra ids dejando solo ObjectId de Mongo validos, convertidos a ObjectId.
 function idsObjectIdValidos(ids) {
   return (ids || [])
     .filter((id) => mongoose.Types.ObjectId.isValid(id))
     .map((id) => new mongoose.Types.ObjectId(id));
 }
 
-/**
- * Busca los productos activos de un negocio por sus ids (strings).
- * Usa idsObjectIdValidos: un id inválido no matchea → el service lo reporta
- * como "no encontrado" y responde 404 limpio, NUNCA un 500 por BSONError.
- */
+// Busca los productos activos de un negocio por sus ids (strings).
 async function buscarActivosPorIds(ids, negocioId) {
   const objectIds = idsObjectIdValidos(ids);
   if (objectIds.length === 0) {
@@ -39,15 +23,7 @@ async function buscarActivosPorIds(ids, negocioId) {
   }).lean();
 }
 
-/**
- * Descuenta stock de forma ATOMICA y CONDICIONAL dentro de una transaccion.
- * Cada updateOne solo aplica si hay stock suficiente (filter con `$gte`),
- * asi dos pedidos concurrentes del ultimo producto no pueden ganar ambos.
- *
- * @param {object[]} snapshot - productos con { id, cantidad }
- * @param {object} session - sesion Mongoose de la transaccion
- * @returns {Promise<boolean>} true si TODOS los productos se descontaron
- */
+// Descuenta stock de forma atomica y condicional dentro de una transaccion.
 async function descontarStock(snapshot, session) {
   const resultado = await Producto.bulkWrite(
     snapshot.map((p) => ({
@@ -61,13 +37,7 @@ async function descontarStock(snapshot, session) {
   return resultado.modifiedCount === snapshot.length;
 }
 
-/**
- * Devuelve stock (al cancelar un pedido). Incondicional — el pedido ya
- * habia descontado ese stock.
- *
- * @param {object[]} productos - snapshot del pedido con { id, cantidad }
- * @param {object} session - sesion Mongoose de la transaccion
- */
+// Devuelve stock al cancelar un pedido (incondicional).
 async function devolverStock(productos, session) {
   await Producto.bulkWrite(
     productos.map((p) => ({

@@ -1,16 +1,3 @@
-# EventListener: el endpoint HTTP que recibe el webhook de GitHub.
-#
-# Al recibir un POST, ejecuta la cadena de interceptores ANTES de crear nada:
-#   1. interceptor "github" → valida la firma HMAC-SHA256 (header
-#      X-Hub-Signature-256) contra el secret github-webhook-secret. Si la firma
-#      no coincide, RECHAZA el evento (defensa anti-spoofing: nadie sin el
-#      secreto puede disparar builds). Además filtra a solo eventos "push".
-#   2. interceptor "cel" → filtra que el push sea a la rama main (ignora pushes
-#      a otras ramas).
-#
-# Si todo pasa: aplica el binding (extrae el SHA) + el template (crea el
-# PipelineRun con doble push). El EventListener crea automáticamente un Service
-# llamado "el-micrositio-github-listener" en el puerto 8080.
 apiVersion: triggers.tekton.dev/v1beta1
 kind: EventListener
 metadata:

@@ -1,7 +1,3 @@
-/**
- * Modelo Usuario (dueno del negocio)
- * Login al panel
- */
 const mongoose = require('mongoose');
 
 const usuarioSchema = new mongoose.Schema(
@@ -27,8 +23,8 @@ const usuarioSchema = new mongoose.Schema(
   { timestamps: { createdAt: 'creadoEn', updatedAt: 'actualizadoEn' } }
 );
 
-// Nunca incluir passwordHash en JSON.stringify
 usuarioSchema.set('toJSON', {
+  // Elimina passwordHash del objeto antes de serializar a JSON
   transform: (doc, ret) => {
     delete ret.passwordHash;
     return ret;

@@ -1,19 +1,15 @@
-/**
- * Health checks para Kubernetes
- * - /health/live: el proceso responde (siempre 200 si Express vive)
- * - /health/ready: dependencias respondiendo (Mongo + Redis)
- * - /health/startup: inicializacion completada
- */
 const express = require('express');
 const mongoose = require('mongoose');
 const redis = require('../services/redis');
 
 const router = express.Router();
 
+// Liveness: responde 200 si el proceso Express esta vivo.
 router.get('/live', (req, res) => {
   res.status(200).json({ status: 'alive' });
 });
 
+// Readiness: verifica que Mongo y Redis respondan antes de marcar listo.
 router.get('/ready', async (req, res) => {
   const chequeos = {
     mongo: false,
@@ -40,6 +36,7 @@ router.get('/ready', async (req, res) => {
   res.status(listo ? 200 : 503).json({ status: listo ? 'ready' : 'not_ready', checks: chequeos });
 });
 
+// Startup: indica si la inicializacion (conexion Mongo) ya completo.
 router.get('/startup', (req, res) => {
   if (mongoose.connection.readyState === 1) {
     res.status(200).json({ status: 'started' });

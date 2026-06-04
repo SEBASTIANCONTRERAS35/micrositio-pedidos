@@ -1,12 +1,3 @@
-/**
- * Worker BullMQ
- * Consume jobs de Redis y los procesa de forma asincrona
- *
- * Colas:
- *  - delivery: solicitar repartidor al carrier
- *  - notificaciones: emails y WhatsApp
- *  - webhook-delivery: procesa actualizaciones de estado del repartidor
- */
 require('dotenv').config();
 const { Worker } = require('bullmq');
 const mongoose = require('mongoose');
@@ -16,6 +7,7 @@ const deliveryJob = require('./jobs/delivery');
 const notificacionesJob = require('./jobs/notificaciones');
 const webhookJob = require('./jobs/webhookDelivery');
 const syncZuyuJob = require('./jobs/syncZuyu');
+const simularCarrierJob = require('./jobs/simularCarrier');
 const { instrumentWorker, startMetricsServer, startQueueDepthCollector } = require('./metrics');
 
 const logger = pino({
@@ -43,12 +35,11 @@ const connection = {
 const workers = [];
 let queueCollector = null;
 
+// Conecta a MongoDB y arranca los workers de colas y el servidor de metricas
 async function start() {
-  // Conectar a MongoDB
   await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 10000 });
   logger.info('MongoDB conectado');
 
-  // Worker de delivery
   workers.push(
     new Worker(
       'delivery',
@@ -64,7 +55,6 @@ async function start() {
     )
   );
 
-  // Worker de notificaciones
   workers.push(
     new Worker(
       'notificaciones',
@@ -80,7 +70,6 @@ async function start() {
     )
   );
 
-  // Worker de webhook-delivery (actualizaciones del carrier)
   workers.push(
     new Worker(
       'webhook-delivery',
@@ -96,7 +85,6 @@ async function start() {
     )
   );
 
-  // Worker de sync con ZUYU (eventos de inventario)
   workers.push(
     new Worker(
       'sync-zuyu',
@@ -112,9 +100,23 @@ async function start() {
     )
   );
 
-  // Logs + Prometheus metrics
+  workers.push(
+    new Worker(
+      'simular-carrier',
+      async (job) => {
+        logger.info({ jobName: job.name, jobId: job.id }, 'Procesando simulacion de carrier');
+        return simularCarrierJob(job, logger);
+      },
+      {
+        connection,
+        concurrency: 5,
+        autorun: true,
+      }
+    )
+  );
+
   workers.forEach((worker) => {
-    instrumentWorker(worker); // counters/histograms/gauges para Prom
+    instrumentWorker(worker);
     worker.on('completed', (job) => {
       logger.info({ jobId: job.id, queue: job.queueName }, 'Job completado');
     });
@@ -126,19 +128,17 @@ async function start() {
     });
   });
 
-  // HTTP server :3001 para Prometheus scraping
   startMetricsServer(parseInt(process.env.METRICS_PORT || '3001', 10));
 
-  // Colector de profundidad de colas → gauge worker_queue_pending (alerta
-  // QueueBacklogHigh + visibilidad del backlog que dispara KEDA).
   queueCollector = startQueueDepthCollector(
-    ['delivery', 'notificaciones', 'webhook-delivery', 'sync-zuyu'],
+    ['delivery', 'notificaciones', 'webhook-delivery', 'sync-zuyu', 'simular-carrier'],
     connection
   );
 
   logger.info(`Worker iniciado con ${workers.length} colas + metrics en :3001`);
 }
 
+// Cierra ordenadamente colector, workers y conexion a MongoDB y termina el proceso
 async function shutdown() {
   logger.info('Cerrando workers...');
   if (queueCollector) {

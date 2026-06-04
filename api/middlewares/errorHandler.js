@@ -1,10 +1,7 @@
-/**
- * Error handler global
- * Convierte errores a respuestas JSON consistentes
- */
 const { AppError } = require('../utils/errors');
 const logger = require('../utils/logger');
 
+// Convierte errores a respuestas JSON consistentes segun su tipo
 function errorHandler(err, req, res, _next) {
   const isProd = process.env.NODE_ENV === 'production';
 
@@ -22,7 +19,6 @@ function errorHandler(err, req, res, _next) {
     });
   }
 
-  // Error no manejado
   logger.error({ err, path: req.path, method: req.method }, 'Unhandled error');
 
   return res.status(500).json({

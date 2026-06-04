@@ -1,4 +1,3 @@
-# Dispara el pipeline CI: kubectl create -f tekton/pipelinerun-example.yaml
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:

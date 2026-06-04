@@ -1,13 +1,3 @@
-# RBAC para el EventListener.
-#
-# El EventListener corre como un Pod que, al recibir un webhook válido, CREA
-# un PipelineRun. Para eso necesita una ServiceAccount con permisos. Usamos
-# los dos ClusterRoles AGREGADOS que instala Tekton Triggers (RBAC mínimo
-# oficial), en vez de inventar reglas propias:
-#   - tekton-triggers-eventlistener-roles        (namespaced): leer triggers,
-#     bindings, templates, secrets/configmaps + CREAR pipelineruns.
-#   - tekton-triggers-eventlistener-clusterroles (cluster):    leer los
-#     clusterinterceptors (github, cel) que viven a nivel de cluster.
 apiVersion: v1
 kind: ServiceAccount
 metadata:

@@ -1,7 +1,3 @@
-# Helm values para grafana/alloy (reemplazo de Promtail).
-# Recolecta logs de pods de TODO el cluster y los envía a Loki.
-# Extrae el campo 'pedidoId' del JSON para poder hacer querys por pedido.
-
 alloy:
   configMap:
     create: true
@@ -78,7 +74,6 @@ controller:
   podLabels:
     app: alloy
 
-# Recolectar todo el cluster procesa más logs → un poco más de RAM.
 resources:
   requests: { cpu: 50m, memory: 128Mi }
   limits: { cpu: 300m, memory: 512Mi }

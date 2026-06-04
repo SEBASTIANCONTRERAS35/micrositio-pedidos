@@ -1,6 +1,3 @@
-/**
- * Logger compartido del worker (Pino con PII redact)
- */
 const pino = require('pino');
 
 const logger = pino({

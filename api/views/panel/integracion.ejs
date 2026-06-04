@@ -3,8 +3,6 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Titulo estatico: el panel es SPA-lite, el JS hidrata negocio/usuario
-         con el JWT de localStorage (no hay datos server-side en el render). -->
     <title>Integración con ZUYU — Panel</title>
     <link rel="stylesheet" href="/css/panel.css" />
     <script defer src="/js/panel-integracion.js"></script>
@@ -38,7 +36,6 @@
       </nav>
 
       <div class="panel-config-card" x-show="!loading" x-cloak>
-        <!-- Estado -->
         <div
           class="panel-status-badge"
           :class="estado.conectado ? 'panel-status-badge--on' : 'panel-status-badge--off'"

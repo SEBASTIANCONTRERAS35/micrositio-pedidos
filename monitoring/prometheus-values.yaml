@@ -1,4 +1,3 @@
-# Helm values para kube-prometheus-stack
 prometheus:
   prometheusSpec:
     retention: 7d
@@ -13,7 +12,6 @@ prometheus:
           resources:
             requests:
               storage: 10Gi
-    # Permitir scraping de servicios en otros namespaces
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
 
@@ -56,7 +54,6 @@ alertmanager:
             requests:
               storage: 1Gi
 
-# No necesitamos exporters para nodos en este lab
 nodeExporter:
   enabled: true
 kubeStateMetrics:

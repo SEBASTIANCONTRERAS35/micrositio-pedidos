@@ -1,9 +1,7 @@
-/**
- * Middleware de autenticacion JWT para rutas protegidas (panel del dueno)
- */
 const { verifyAccessToken, isAccessTokenRevoked } = require('../services/auth/jwt');
 const { AuthenticationError } = require('../utils/errors');
 
+// Middleware de autenticacion JWT para rutas protegidas (panel del dueno)
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -23,8 +21,8 @@ async function requireAuth(req, res, next) {
       id: payload.sub,
       email: payload.email,
       negocioId: payload.negocioId,
-      jti: payload.jti, // necesario para revocar el token en logout
-      exp: payload.exp, // TTL del blacklist al revocar
+      jti: payload.jti,
+      exp: payload.exp,
     };
     next();
   } catch (err) {

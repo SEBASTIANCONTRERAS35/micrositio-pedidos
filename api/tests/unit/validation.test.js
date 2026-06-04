@@ -1,4 +1,3 @@
-// describe/it/expect globales (vitest.config.js → globals: true)
 const { z } = require('zod');
 const { validate } = require('../../middlewares/validation');
 
@@ -7,6 +6,7 @@ const schema = z.object({
   edad: z.number().int().positive(),
 });
 
+// Ejecuta un middleware y resuelve con el error y el req resultantes.
 function runMiddleware(mw, req) {
   return new Promise((resolve) => {
     const res = {};

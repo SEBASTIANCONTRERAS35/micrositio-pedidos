@@ -1,36 +1,35 @@
-/**
- * Job: solicitar-repartidor
- * Llama al carrier configurado por el negocio y guarda deliveryId en el pedido
- */
 const mongoose = require('mongoose');
 
-// Reutilizamos el modelo del API (en producción sería package compartido)
 const pedidoSchema = new mongoose.Schema({}, { strict: false, collection: 'pedidos' });
 const Pedido = mongoose.models.Pedido || mongoose.model('Pedido', pedidoSchema);
 
-// El negocio aporta la dirección de pickup (origen del envío) que los
-// providers de delivery necesitan — ver domain/envio.js.
 const negocioSchema = new mongoose.Schema({}, { strict: false, collection: 'negocios' });
 const Negocio = mongoose.models.Negocio || mongoose.model('Negocio', negocioSchema);
 
 const { Queue } = require('bullmq');
+const redisConnection = {
+  host: process.env.REDIS_HOST,
+  port: parseInt(process.env.REDIS_PORT || '6379', 10),
+  password: process.env.REDIS_PASSWORD,
+};
+
 const colaNotificaciones = new Queue('notificaciones', {
-  connection: {
-    host: process.env.REDIS_HOST,
-    port: parseInt(process.env.REDIS_PORT || '6379', 10),
-    password: process.env.REDIS_PASSWORD,
-  },
-  // Limpieza automática: no acumular jobs terminados en Redis.
+  connection: redisConnection,
   defaultJobOptions: { removeOnComplete: 1000, removeOnFail: 5000 },
 });
 
-// Carriers (mock o real) — copia local en worker/services/delivery/
+const colaSimularCarrier = new Queue('simular-carrier', {
+  connection: redisConnection,
+  defaultJobOptions: { removeOnComplete: 1000, removeOnFail: 5000 },
+});
+
 const carriers = {
   ivoy: require('../services/delivery/providers/ivoy'),
   lalamove: require('../services/delivery/providers/lalamove'),
   uberDirect: require('../services/delivery/providers/uberDirect'),
 };
 
+// Procesa jobs de solicitud y cancelacion de repartidor segun job.name
 module.exports = async (job, logger) => {
   if (job.name === 'solicitar-repartidor') {
     const { pedidoId, proveedor } = job.data;
@@ -40,16 +39,11 @@ module.exports = async (job, logger) => {
       throw new Error(`Pedido ${pedidoId} no encontrado`);
     }
 
-    // Origen del envío: dirección del negocio. findById castea negocioId a
-    // ObjectId (un valor no-ObjectId daría CastError, no inyección).
     const negocio = await Negocio.findById(pedido.negocioId).lean();
 
     const repartidorProveedor = carriers[proveedor] || carriers.ivoy;
     const resultado = await repartidorProveedor.requestDelivery(pedido, negocio);
 
-    // .set() en vez de asignación directa: con schema strict:false un campo
-    // NUEVO asignado con "=" no llega al _doc interno de Mongoose y save() lo
-    // ignora aunque se llame markModified. .set() sí lo registra.
     pedido.set('delivery', {
       proveedor,
       deliveryId: resultado.deliveryId,
@@ -67,15 +61,24 @@ module.exports = async (job, logger) => {
     pedido.markModified('historial');
     await pedido.save();
 
-    // Notificar al cliente
     await colaNotificaciones.add('repartidor-asignado', { pedidoId });
+
+    // En modo mock, simula la progresion del carrier (recolectado -> en camino ->
+    // entregado) emitiendo los eventos via la cola webhook-delivery con retardos.
+    if (resultado.deliveryId && resultado.deliveryId.includes('mock')) {
+      await colaSimularCarrier.add(
+        'simular-carrier',
+        { pedidoId, deliveryId: resultado.deliveryId, provider: proveedor, paso: 0 },
+        { delay: 6000 }
+      );
+      logger.info({ pedidoId, deliveryId: resultado.deliveryId }, 'Simulacion de carrier (mock) agendada');
+    }
 
     logger.info({ pedidoId, deliveryId: resultado.deliveryId, proveedor }, 'Repartidor solicitado');
     return { ok: true, deliveryId: resultado.deliveryId };
   }
 
   if (job.name === 'cancelar-repartidor') {
-    // El pedido se cancelo y ya tenia repartidor — cancelarlo en el carrier.
     const { deliveryId, proveedor } = job.data;
     const repartidorProveedor = carriers[proveedor] || carriers.ivoy;
     const resultado = await repartidorProveedor.cancelDelivery(deliveryId);

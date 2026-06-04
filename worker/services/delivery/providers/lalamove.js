@@ -1,9 +1,3 @@
-/**
- * Lalamove provider — para CDMX/ZMVM
- * Por defecto en MOCK (LALAMOVE_MOCK=true)
- * En produccion: HMAC-SHA256 con timestamp
- * Doc: https://developers.lalamove.com/
- */
 const crypto = require('crypto');
 const { verifyHmacSignature, isTimestampValid } = require('../../../utils/hmac');
 const { construirOrigenEnvio } = require('../../../domain/envio');
@@ -11,14 +5,7 @@ const { construirOrigenEnvio } = require('../../../domain/envio');
 const IS_MOCK = process.env.LALAMOVE_MOCK !== 'false';
 const BASE_URL = process.env.LALAMOVE_BASE_URL || 'https://rest.sandbox.lalamove.com/v3';
 
-/**
- * Firma una request al API de Lalamove v3 (HMAC-SHA256). Centraliza el
- * esquema de firma para que requestDelivery y getStatus no lo dupliquen.
- * @param {string} method - 'GET' | 'POST'
- * @param {string} path - ruta firmada, ej. '/v3/orders' o '/v3/orders/123'
- * @param {string} [body] - body crudo (vacío en GET)
- * @returns {{ timestamp: number, header: string }}
- */
+// Firma una request al API de Lalamove v3 con HMAC-SHA256.
 function firmarLalamove(method, path, body = '') {
   const timestamp = Date.now();
   const firmaCruda = `${timestamp}\r\n${method}\r\n${path}\r\n\r\n${body}`;
@@ -32,6 +19,7 @@ function firmarLalamove(method, path, body = '') {
   };
 }
 
+// Crea una orden de entrega en Lalamove (o devuelve mock).
 async function requestDelivery(pedido, negocio) {
   if (IS_MOCK) {
     return {
@@ -42,8 +30,6 @@ async function requestDelivery(pedido, negocio) {
     };
   }
 
-  // Implementacion real con HMAC. El origen (pickup) sale del negocio:
-  // Lalamove cotiza por distancia, asi que necesita coordenadas reales.
   const origen = construirOrigenEnvio(negocio);
   const body = JSON.stringify({
     serviceType: 'MOTORCYCLE',
@@ -79,12 +65,11 @@ async function requestDelivery(pedido, negocio) {
   };
 }
 
+// Consulta el estado de una entrega en Lalamove (o devuelve mock).
 async function getStatus(deliveryId) {
   if (IS_MOCK) {
     return { estado: 'pickup' };
   }
-  // GET /v3/orders/:id — mismo esquema HMAC que requestDelivery (sin body).
-  // encodeURIComponent: el deliveryId va en la URL — defensa de path.
   const id = encodeURIComponent(deliveryId);
   const { header } = firmarLalamove('GET', `/v3/orders/${id}`);
   const respuesta = await fetch(`${BASE_URL}/orders/${id}`, {
@@ -97,11 +82,11 @@ async function getStatus(deliveryId) {
   return { estado: mapEstado(datos.status || (datos.order && datos.order.status)) };
 }
 
+// Cancela una entrega en Lalamove (o devuelve mock).
 async function cancelDelivery(deliveryId) {
   if (IS_MOCK) {
     return { ok: true };
   }
-  // DELETE /v3/orders/:id — mismo esquema HMAC que requestDelivery.
   const id = encodeURIComponent(deliveryId);
   const { header } = firmarLalamove('DELETE', `/v3/orders/${id}`);
   const respuesta = await fetch(`${BASE_URL}/orders/${id}`, {
@@ -111,11 +96,12 @@ async function cancelDelivery(deliveryId) {
   return { ok: respuesta.ok };
 }
 
+// Verifica la firma HMAC y timestamp de un webhook de Lalamove.
 function verifyWebhook(body, headers) {
   const secreto = process.env.WEBHOOK_SECRET_LALAMOVE;
   if (!secreto) {
     return true;
-  } // dev only
+  }
   const firma = headers['x-lalamove-signature'];
   const marcaTiempo = headers['x-lalamove-timestamp'];
   if (!isTimestampValid(marcaTiempo)) {
@@ -124,6 +110,7 @@ function verifyWebhook(body, headers) {
   return verifyHmacSignature(`${marcaTiempo}.${body}`, firma, secreto);
 }
 
+// Normaliza el payload de un webhook de Lalamove a formato interno.
 function parseWebhook(body) {
   return {
     deliveryId: body.orderId,
@@ -134,6 +121,7 @@ function parseWebhook(body) {
   };
 }
 
+// Mapea un estado de Lalamove al estado interno equivalente.
 function mapEstado(s) {
   const mapa = {
     ASSIGNING_DRIVER: 'pending',

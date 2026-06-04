@@ -1,7 +1,3 @@
-# ═══════════════════════════════════════════════════════════════════
-# Headless Service para MongoDB Replica Set
-# clusterIP: None es OBLIGATORIO para que cada pod tenga su DNS estable
-# ═══════════════════════════════════════════════════════════════════
 apiVersion: v1
 kind: Service
 metadata:
@@ -11,7 +7,7 @@ metadata:
     app: mongodb
     component: database
 spec:
-  clusterIP: None  # Headless service
+  clusterIP: None
   selector:
     app: mongodb
   ports:
@@ -19,4 +15,4 @@ spec:
       port: 27017
       targetPort: 27017
       protocol: TCP
-  publishNotReadyAddresses: true  # Para que el RS pueda formarse
+  publishNotReadyAddresses: true

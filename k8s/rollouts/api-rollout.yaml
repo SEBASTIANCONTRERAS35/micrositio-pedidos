@@ -1,7 +1,3 @@
-# ═══════════════════════════════════════════════════════════════════
-# Rollout del API con estrategia Canary 10% -> 50% -> 100%
-# REEMPLAZA al Deployment del API (no aplicar ambos)
-# ═══════════════════════════════════════════════════════════════════
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
@@ -17,10 +13,6 @@ spec:
       app: api
   strategy:
     canary:
-      # maxSurge:0 -> el rollout BORRA antes de CREAR (no apila pods nuevos en un
-      # nodo mientras los viejos balancean). Así cada pod nuevo respeta el
-      # topologySpread y queda SIEMPRE 1-por-nodo (necesario para
-      # internalTrafficPolicy:Local). Costo: ventana breve de 1 pod por paso.
       maxSurge: 0
       maxUnavailable: 1
       steps:
@@ -32,7 +24,7 @@ spec:
       analysis:
         templates:
           - templateName: api-error-rate
-        startingStep: 2 # empieza analisis al llegar al 50%
+        startingStep: 2
         args:
           - name: service-name
             value: api
@@ -46,17 +38,10 @@ spec:
       serviceAccountName: api-sa
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 30
-      # Reparte 1 pod api por nodo (maxSkew:1 tolera el pod surge del Canary:
-      # 2-1 durante el despliegue, 1-1 en reposo). Necesario para que
-      # internalTrafficPolicy:Local del Service api tenga endpoint local en
-      # cada nodo donde corre un ingress-nginx (DaemonSet).
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: DoNotSchedule
-          # Excluye del cálculo de skew los nodos con taints no tolerados (el
-          # master control-plane). Sin esto, el master cuenta como dominio en 0
-          # y el pod surge del canary viola maxSkew:1 -> queda Pending.
           nodeTaintsPolicy: Honor
           labelSelector:
             matchLabels:

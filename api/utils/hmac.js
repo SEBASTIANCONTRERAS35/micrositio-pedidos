@@ -1,16 +1,6 @@
-/**
- * Verificacion de firmas HMAC para webhooks
- * Usa timingSafeEqual para evitar timing attacks
- */
 const crypto = require('crypto');
 
-/**
- * Verifica una firma HMAC-SHA256
- * @param {Buffer|string} body - body crudo del request
- * @param {string} signature - firma recibida (puede tener prefijo tipo 'sha256=...')
- * @param {string} secret - secret compartido
- * @returns {boolean}
- */
+// Verifica una firma HMAC-SHA256
 function verifyHmacSignature(body, signature, secret) {
   if (!signature || !secret) {
     return false;
@@ -34,12 +24,7 @@ function verifyHmacSignature(body, signature, secret) {
   }
 }
 
-/**
- * Verifica que el timestamp este dentro de una ventana (replay attack prevention)
- * @param {number} timestamp - timestamp Unix en segundos
- * @param {number} toleranceSeconds - ventana de tolerancia (default: 300 = 5 min)
- * @returns {boolean}
- */
+// Verifica que el timestamp este dentro de una ventana (replay attack prevention)
 function isTimestampValid(timestamp, toleranceSeconds = 300) {
   const ts = parseInt(timestamp, 10);
   if (isNaN(ts)) {
@@ -50,9 +35,7 @@ function isTimestampValid(timestamp, toleranceSeconds = 300) {
   return Math.abs(now - ts) <= toleranceSeconds;
 }
 
-/**
- * Genera firma HMAC para hacer pruebas o llamadas salientes
- */
+// Genera firma HMAC para hacer pruebas o llamadas salientes
 function signHmac(body, secret) {
   return crypto
     .createHmac('sha256', secret)
@@ -60,17 +43,7 @@ function signHmac(body, secret) {
     .digest('hex');
 }
 
-/**
- * Verifica una firma estilo Stripe / ZUYU.
- * Header esperado:  X-Zuyu-Signature: t=<unix>,v1=<hmac>[,v0=<hmac_previo>]
- * Se firma  `${t}.${rawBody}`  (no solo el body).
- *
- * @param {string} rawBody - body crudo exacto
- * @param {string} signatureHeader - valor del header X-Zuyu-Signature
- * @param {string[]} secrets - [secretActual, secretPrevio?]
- * @param {number} [toleranceSeconds=300]
- * @returns {boolean}
- */
+// Verifica una firma estilo Stripe / ZUYU.
 function verifyZuyuSignature(rawBody, signatureHeader, secrets, toleranceSeconds = 300) {
   if (!signatureHeader || !Array.isArray(secrets) || secrets.length === 0) {
     return false;
@@ -88,7 +61,6 @@ function verifyZuyuSignature(rawBody, signatureHeader, secrets, toleranceSeconds
     return false;
   }
 
-  // Anti-replay: timestamp dentro de la ventana
   if (!isTimestampValid(t, toleranceSeconds)) {
     return false;
   }
@@ -107,7 +79,6 @@ function verifyZuyuSignature(rawBody, signatureHeader, secrets, toleranceSeconds
           return true;
         }
       } catch {
-        /* longitudes invalidas — seguir probando */
       }
     }
   }

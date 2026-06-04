@@ -1,6 +1,3 @@
-/**
- * Login del dueno del negocio
- */
 const express = require('express');
 const { z } = require('zod');
 const Usuario = require('../models/usuario');
@@ -28,7 +25,7 @@ const RefreshSchema = z.object({
   refreshToken: z.string().min(10),
 });
 
-// POST /api/auth/login
+// Login del dueno del negocio: valida credenciales y emite tokens
 router.post('/login', authLimiter, validate(LoginSchema), async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -51,7 +48,7 @@ router.post('/login', authLimiter, validate(LoginSchema), async (req, res, next)
   }
 });
 
-// POST /api/auth/refresh
+// Rota el refresh token y emite un nuevo access token
 router.post('/refresh', sensitiveLimiter, validate(RefreshSchema), async (req, res, next) => {
   try {
     const { userId, newToken } = await rotateRefreshToken(req.body.refreshToken);
@@ -72,8 +69,7 @@ router.post('/refresh', sensitiveLimiter, validate(RefreshSchema), async (req, r
   }
 });
 
-// POST /api/auth/logout — revoca el refresh token Y el access token actual.
-// requireAuth nos da el jti del access token para meterlo en la blacklist.
+// Logout: revoca el refresh token y el access token actual
 router.post(
   '/logout',
   sensitiveLimiter,

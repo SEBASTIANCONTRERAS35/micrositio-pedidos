@@ -1,9 +1,3 @@
-/**
- * Rutas publicas del micrositio
- * GET /tienda/:slug — catalogo del negocio (fuente: ZUYU API o Mongo local segun ZUYU_MOCK)
- * GET /tienda/:slug/checkout — formulario de checkout
- * GET /tienda/:slug/pedido/:pedidoId — confirmacion del pedido
- */
 const express = require('express');
 const mongoose = require('mongoose');
 const Negocio = require('../models/negocio');
@@ -14,29 +8,25 @@ const zuyu = require('../services/zuyu');
 
 const router = express.Router();
 
+// Renderiza el catalogo del negocio usando cache local o ZUYU
 router.get('/:slug', async (req, res) => {
   const slug = req.params.slug;
 
-  // Cache local (TTL largo: ZUYU manda webhooks para invalidar)
   const cacheado = tiendaCache.get(slug);
   if (cacheado) {
     return res.render('tienda/index', cacheado);
   }
 
-  // Fuente de verdad: ZUYU (en mock = mongo local). getCatalogo ya devuelve
-  // la "vista de catalogo" normalizada por el ACL mapper — la ruta NO
-  // re-mapea ni re-agrupa: solo cachea y renderea.
   const catalogo = await zuyu.getCatalogo(slug);
   if (!catalogo) {
     return res.status(404).render('tienda/404', { mensaje: 'Negocio no encontrado' });
   }
 
-  // Cache largo (1 hora). ZUYU manda webhook para invalidar antes si hay cambios.
   tiendaCache.set(slug, catalogo, 60 * 60 * 1000);
   res.render('tienda/index', catalogo);
 });
 
-// Detalle de un producto del catálogo
+// Muestra el detalle de un producto del catalogo
 router.get('/:slug/producto/:productoId', async (req, res) => {
   const { slug, productoId } = req.params;
   const negocio = await Negocio.findOne({ slug, activo: true }).lean();
@@ -60,6 +50,7 @@ router.get('/:slug/producto/:productoId', async (req, res) => {
   });
 });
 
+// Renderiza el formulario de checkout del negocio
 router.get('/:slug/checkout', async (req, res) => {
   const negocio = await Negocio.findOne({ slug: req.params.slug, activo: true }).lean();
   if (!negocio) {
@@ -68,6 +59,7 @@ router.get('/:slug/checkout', async (req, res) => {
   res.render('tienda/checkout', { negocio: { ...negocio, slug: req.params.slug } });
 });
 
+// Muestra la confirmacion de un pedido validando que sea del negocio
 router.get('/:slug/pedido/:pedidoId', async (req, res) => {
   const negocio = await Negocio.findOne({ slug: req.params.slug, activo: true }).lean();
   if (!negocio) {
@@ -79,7 +71,6 @@ router.get('/:slug/pedido/:pedidoId', async (req, res) => {
     return res.status(404).render('tienda/404', { mensaje: 'Pedido no encontrado' });
   }
 
-  // Solo mostrar pedidos del mismo negocio
   if (pedido.negocioId.toString() !== negocio._id.toString()) {
     return res.status(404).render('tienda/404', { mensaje: 'Pedido no encontrado' });
   }

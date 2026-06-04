@@ -1,12 +1,3 @@
-/**
- * Job: notificaciones
- * Envia email (Resend) y WhatsApp (Twilio Sandbox) al cliente
- *
- * Tipos:
- *  - confirmacion-cliente: pedido recibido
- *  - repartidor-asignado: tu pedido va en camino
- *  - entregado: confirmacion de entrega
- */
 const mongoose = require('mongoose');
 const { Resend } = require('resend');
 const twilio = require('twilio');
@@ -19,6 +10,7 @@ const twilioClient = process.env.TWILIO_ACCOUNT_SID
   ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
   : null;
 
+// Procesa el job y envia email y WhatsApp al cliente del pedido.
 module.exports = async (job, logger) => {
   const { pedidoId } = job.data;
   const pedido = await Pedido.findOne({ pedidoId }).lean();
@@ -38,6 +30,7 @@ module.exports = async (job, logger) => {
   return { ok: true };
 };
 
+// Envia el email del pedido via Resend si esta configurado.
 async function sendEmail(pedido, subject, html, logger) {
   if (!resend || !pedido.cliente?.email) {
     logger.warn(
@@ -59,6 +52,7 @@ async function sendEmail(pedido, subject, html, logger) {
   }
 }
 
+// Envia el mensaje de WhatsApp del pedido via Twilio si esta configurado.
 async function sendWhatsApp(pedido, message, logger) {
   if (!twilioClient || !pedido.cliente?.telefono) {
     logger.warn({ pedidoId: pedido.pedidoId }, 'WhatsApp no enviado (Twilio no configurado)');
@@ -76,6 +70,7 @@ async function sendWhatsApp(pedido, message, logger) {
   }
 }
 
+// Devuelve el asunto del email segun el tipo de job.
 function subjectFor(jobName, pedido) {
   const mapa = {
     'confirmacion-cliente': `Pedido recibido — ${pedido.pedidoId}`,
@@ -85,6 +80,7 @@ function subjectFor(jobName, pedido) {
   return mapa[jobName] || `Actualizacion de tu pedido ${pedido.pedidoId}`;
 }
 
+// Construye el cuerpo HTML del email segun el tipo de job.
 function htmlFor(jobName, pedido) {
   const base = `
     <h2>${subjectFor(jobName, pedido)}</h2>
@@ -98,6 +94,7 @@ function htmlFor(jobName, pedido) {
   return base + (cuerpo[jobName] || '');
 }
 
+// Construye el texto del SMS/WhatsApp segun el tipo de job.
 function smsFor(jobName, pedido) {
   const mapa = {
     'confirmacion-cliente': `Hola ${pedido.cliente.nombre}, tu pedido ${pedido.pedidoId} fue recibido. Total: $${pedido.total.toFixed(2)}.`,

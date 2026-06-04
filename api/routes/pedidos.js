@@ -1,12 +1,13 @@
-/**
- * API REST de pedidos
- */
 const express = require('express');
 const { z } = require('zod');
 const { validate } = require('../middlewares/validation');
 const idempotency = require('../middlewares/idempotency');
 const requireAuth = require('../middlewares/auth');
 const { publicLimiter } = require('../middlewares/rateLimit');
+const Pedido = require('../models/pedido');
+const Negocio = require('../models/negocio');
+const { perteneceANegocio, proyectarEstadoPublico } = require('../domain/trackingPublico');
+const { NotFoundError } = require('../utils/errors');
 const {
   crearPedidoConStock,
   confirmarPedido,
@@ -14,6 +15,15 @@ const {
 } = require('../services/pedidoService');
 
 const router = express.Router();
+
+const EstadoParamsSchema = z.object({
+  pedidoId: z
+    .string()
+    .trim()
+    .min(1)
+    .max(64)
+    .regex(/^[\w-]+$/, 'ID de pedido invalido'),
+});
 
 const PedidoSchema = z.object({
   negocioSlug: z.string().min(1).max(60),
@@ -26,9 +36,6 @@ const PedidoSchema = z.object({
   productos: z
     .array(
       z.object({
-        // Acepta ObjectId hex (mock: 24 chars [a-f0-9]) Y SKU de ZUYU
-        // (e.g. "AVI-250") — mismo patron que usa publicApi de ZUYU
-        // (publicApi/shared/validation/schemas.js).
         id: z
           .string()
           .trim()
@@ -44,11 +51,9 @@ const PedidoSchema = z.object({
   notas: z.string().max(500).optional(),
 });
 
-// POST /api/pedidos — publico, con idempotencia y rate limit
+// Crea un pedido publico con stock, idempotencia y rate limit.
 router.post('/', publicLimiter, idempotency, validate(PedidoSchema), async (req, res, next) => {
   try {
-    // El Idempotency-Key (header) se pasa al service para usarlo como
-    // referenciaExterna estable hacia ZUYU (ver crearPedidoViaZuyu).
     const pedido = await crearPedidoConStock({
       ...req.body,
       idempotencyKey: req.headers['idempotency-key'] || null,
@@ -63,7 +68,38 @@ router.post('/', publicLimiter, idempotency, validate(PedidoSchema), async (req,
   }
 });
 
-// POST /api/pedidos/:id/confirmar — solo dueno (scoped a su negocio)
+// Devuelve el estado publico de un pedido para tracking, scoped por negocio (anti-IDOR, sin PII sensible).
+router.get(
+  '/:pedidoId/estado',
+  publicLimiter,
+  validate(EstadoParamsSchema, 'params'),
+  async (req, res, next) => {
+    try {
+      const slug = typeof req.query.slug === 'string' ? req.query.slug.trim() : '';
+      if (!slug || slug.length > 60) {
+        throw new NotFoundError('Pedido no encontrado');
+      }
+
+      const negocio = await Negocio.findOne({ slug, activo: true }).select('_id').lean();
+      if (!negocio) {
+        throw new NotFoundError('Pedido no encontrado');
+      }
+
+      const pedido = await Pedido.findOne({ pedidoId: req.params.pedidoId })
+        .select('estado historial delivery negocioId')
+        .lean();
+      if (!pedido || !perteneceANegocio(pedido, negocio)) {
+        throw new NotFoundError('Pedido no encontrado');
+      }
+
+      res.json(proyectarEstadoPublico(pedido));
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+// Confirma un pedido del negocio del dueno autenticado.
 router.post('/:id/confirmar', requireAuth, async (req, res, next) => {
   try {
     const pedido = await confirmarPedido(req.params.id, req.user.id, req.user.negocioId);
@@ -73,7 +109,7 @@ router.post('/:id/confirmar', requireAuth, async (req, res, next) => {
   }
 });
 
-// POST /api/pedidos/:id/cancelar — solo dueno (scoped a su negocio)
+// Cancela un pedido del negocio del dueno autenticado.
 router.post('/:id/cancelar', requireAuth, async (req, res, next) => {
   try {
     const pedido = await cancelarPedido(req.params.id, req.user.id, req.user.negocioId);

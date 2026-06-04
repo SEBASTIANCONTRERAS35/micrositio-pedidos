@@ -1,14 +1,10 @@
-# ═══════════════════════════════════════════════════════════════════
-# Default deny ALL ingress y egress en el namespace
-# A partir de aqui SOLO se permite lo explicitamente autorizado
-# ═══════════════════════════════════════════════════════════════════
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: default-deny-all
   namespace: micrositio
 spec:
-  podSelector: {}  # aplica a todos los pods del namespace
+  podSelector: {}
   policyTypes:
     - Ingress
     - Egress

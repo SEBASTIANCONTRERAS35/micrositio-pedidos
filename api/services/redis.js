@@ -1,6 +1,3 @@
-/**
- * Cliente Redis compartido (singleton) para cache, idempotencia, rate limiting
- */
 const Redis = require('ioredis');
 const logger = require('../utils/logger');
 
@@ -9,6 +6,7 @@ const redis = new Redis({
   port: parseInt(process.env.REDIS_PORT || '6379', 10),
   password: process.env.REDIS_PASSWORD,
   maxRetriesPerRequest: 3,
+  // Calcula el retardo de reintento de conexion (max 3000 ms).
   retryStrategy: (times) => Math.min(times * 100, 3000),
 });
 

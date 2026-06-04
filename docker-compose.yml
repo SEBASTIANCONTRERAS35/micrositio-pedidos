@@ -57,9 +57,6 @@ services:
         condition: service_completed_successfully
     ports:
       - '3000:3000'
-    # .env aporta las vars de integración (ZUYU_*, carriers, etc).
-    # El bloque environment: tiene prioridad sobre env_file, así que
-    # Mongo/Redis siguen apuntando a los hostnames internos de Docker.
     env_file:
       - .env
     environment:
@@ -88,8 +85,6 @@ services:
         condition: service_healthy
       mongodb-init:
         condition: service_completed_successfully
-    # .env aporta las vars de integración (ZUYU_*, carriers, etc).
-    # El bloque environment: tiene prioridad sobre env_file.
     env_file:
       - .env
     environment:

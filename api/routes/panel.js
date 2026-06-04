@@ -1,6 +1,3 @@
-/**
- * Panel del dueno del negocio (vistas + endpoints JSON)
- */
 const express = require('express');
 const { z } = require('zod');
 const Pedido = require('../models/pedido');
@@ -13,8 +10,6 @@ const { assertSafeUrl } = require('../utils/urlGuard');
 
 const router = express.Router();
 
-// Validacion del body de PUT /api/integracion. apiKey/webhookSecret son
-// opcionales (vacio = "no cambiar"); baseUrl la valida a fondo el guard SSRF.
 const IntegracionSchema = z.object({
   baseUrl: z.string().trim().max(300).optional(),
   apiKey: z.string().trim().min(8).max(300).optional(),
@@ -22,20 +17,16 @@ const IntegracionSchema = z.object({
   conectado: z.boolean().optional(),
 });
 
-// Vistas EJS — el panel es un SPA-lite: el servidor entrega el HTML estatico
-// y el JS del cliente lo hidrata leyendo el JWT de localStorage y llamando a
-// /panel/api/me. Por eso el render NO recibe datos del negocio/usuario:
-// evita exponer un placeholder falso ("Mi Negocio") y mantiene la vista
-// como unica fuente de verdad client-side. Ver docs/adr/009.
+// Renderiza la vista de login del panel
 router.get('/login', (req, res) => res.render('panel/login'));
 
+// Renderiza la vista de pedidos del panel
 router.get('/pedidos', (req, res) => res.render('panel/pedidos'));
 
+// Renderiza la vista de integracion del panel
 router.get('/integracion', (req, res) => res.render('panel/integracion'));
 
-// ── Integracion con ZUYU ─────────────────────────────────────────
-// Estado de la integracion. NUNCA devuelve apiKey/webhookSecret en claro —
-// solo el prefijo visible y banderas de "configurado".
+// Devuelve el estado de la integracion sin exponer secretos en claro
 router.get('/api/integracion', requireAuth, async (req, res, next) => {
   try {
     const negocio = await Negocio.findById(req.user.negocioId)
@@ -58,9 +49,7 @@ router.get('/api/integracion', requireAuth, async (req, res, next) => {
   }
 });
 
-// Guarda la config de ZUYU. apiKey/webhookSecret solo se actualizan si vienen
-// con valor (vacio = "no cambiar") — asi el usuario puede editar la baseUrl o
-// el toggle sin re-capturar el secreto. Los secretos se cifran at-rest.
+// Guarda la config de ZUYU cifrando secretos solo si vienen con valor
 router.put('/api/integracion', requireAuth, validate(IntegracionSchema), async (req, res, next) => {
   try {
     const { baseUrl, apiKey, webhookSecret, conectado } = req.body || {};
@@ -77,7 +66,6 @@ router.put('/api/integracion', requireAuth, validate(IntegracionSchema), async (
     const zc = negocio.zuyuConfig;
 
     if (baseUrl !== undefined && baseUrl !== '') {
-      // Guard SSRF: solo https, sin IPs privadas/loopback/metadata cloud.
       try {
         await assertSafeUrl(baseUrl);
       } catch (e) {
@@ -88,12 +76,11 @@ router.put('/api/integracion', requireAuth, validate(IntegracionSchema), async (
 
     if (apiKey) {
       const clave = String(apiKey).trim();
-      zc.apiKey = encryptSecret(clave); // cifrado at-rest (AES-256-GCM)
-      zc.apiKeyPrefix = clave.slice(0, 12); // prefijo en claro — no es secreto
+      zc.apiKey = encryptSecret(clave);
+      zc.apiKeyPrefix = clave.slice(0, 12);
     }
 
     if (webhookSecret) {
-      // Rotacion dual-secret: el secret actual (ya cifrado) pasa a "previo".
       if (zc.webhookSecret) {
         zc.webhookSecretPrevio = zc.webhookSecret;
       }
@@ -129,7 +116,7 @@ router.put('/api/integracion', requireAuth, validate(IntegracionSchema), async (
   }
 });
 
-// API JSON (autenticada)
+// Lista los ultimos 100 pedidos del negocio autenticado
 router.get('/api/pedidos', requireAuth, async (req, res, next) => {
   try {
     const pedidos = await Pedido.find({ negocioId: req.user.negocioId })
@@ -142,6 +129,7 @@ router.get('/api/pedidos', requireAuth, async (req, res, next) => {
   }
 });
 
+// Devuelve el usuario y negocio del solicitante autenticado
 router.get('/api/me', requireAuth, async (req, res, next) => {
   try {
     const [usuario, negocio] = await Promise.all([

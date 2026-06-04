@@ -1,14 +1,9 @@
-/**
- * Tests de los calculos de dominio del Pedido (api/domain/pedidoCalculos.js).
- * Funciones puras — sin BD. describe/it/expect globales.
- */
 const {
   construirSnapshot,
   calcularTotales,
   COSTO_ENVIO_BASE,
 } = require('../../domain/pedidoCalculos');
 
-// Productos "de BD": _id es string (su .toString() devuelve el mismo string).
 const productosDb = [
   { _id: 'prod-a', nombre: 'Cafe', precio: 50, stock: 10 },
   { _id: 'prod-b', nombre: 'Pan', precio: 30, stock: 2 },
@@ -33,7 +28,7 @@ describe('construirSnapshot', () => {
 
   it('detecta faltante cuando la cantidad pedida supera el stock', () => {
     const { faltantes } = construirSnapshot(
-      [{ id: 'prod-b', cantidad: 5 }], // solo hay 2
+      [{ id: 'prod-b', cantidad: 5 }],
       productosDb
     );
     expect(faltantes).toEqual([{ id: 'prod-b', pedido: 5, disponible: 2 }]);
@@ -48,7 +43,6 @@ describe('construirSnapshot', () => {
       productosDb
     );
     expect(noEncontrados).toEqual(['prod-fantasma']);
-    // el producto que SI existe igual entra al snapshot
     expect(snapshot).toHaveLength(1);
     expect(snapshot[0].id).toBe('prod-a');
   });
@@ -63,8 +57,8 @@ describe('construirSnapshot', () => {
 describe('calcularTotales', () => {
   it('subtotal = suma de precioUnitario * cantidad; total suma el envio', () => {
     const snapshot = [
-      { precioUnitario: 50, cantidad: 3 }, // 150
-      { precioUnitario: 30, cantidad: 2 }, // 60
+      { precioUnitario: 50, cantidad: 3 },
+      { precioUnitario: 30, cantidad: 2 },
     ];
     const { subtotal, costoEnvio, total } = calcularTotales(snapshot);
     expect(subtotal).toBe(210);

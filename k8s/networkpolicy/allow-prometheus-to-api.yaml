@@ -1,4 +1,3 @@
-# Permitir Prometheus (ns observability) scrape /metrics del api
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

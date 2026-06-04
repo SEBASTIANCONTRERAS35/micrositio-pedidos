@@ -7,9 +7,9 @@ metadata:
     app: redis
     component: queue
 spec:
-  replicas: 1  # Single instance OK para BullMQ; persistencia via AOF + PVC
+  replicas: 1
   strategy:
-    type: Recreate  # No rolling porque solo hay 1 PVC RWO
+    type: Recreate
   selector:
     matchLabels:
       app: redis
@@ -60,7 +60,7 @@ spec:
             periodSeconds: 5
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false  # Redis necesita escribir a /data
+            readOnlyRootFilesystem: false
             capabilities:
               drop: [ALL]
           volumeMounts:

@@ -1,6 +1,3 @@
-# ConfigMap con dashboard JSON para auto-import en Grafana (sidecar dashboard provider)
-# kube-prometheus-stack tiene un sidecar que carga ConfigMaps con label grafana_dashboard=1
-# El dashboard aparece automáticamente en Grafana → Dashboards → Browse
 apiVersion: v1
 kind: ConfigMap
 metadata:

@@ -1,20 +1,3 @@
-# ═══════════════════════════════════════════════════════════════════
-# Job de inicialización del MongoDB Replica Set + creación de usuarios.
-#
-# Pasos:
-#   1. Espera a que mongodb-0/1/2 estén alcanzables
-#   2. rs.initiate() (idempotente — si ya existe, skip)
-#   3. Espera elección de PRIMARY
-#   4. Crea usuarios root/app/worker via localhost exception (mongo-0)
-#   5. Idempotente: re-correr no rompe nada
-#
-# ArgoCD PreSync hook: corre ANTES de aplicar el resto de manifiestos.
-# En deploy inicial las NetworkPolicies aún no existen → el Job conecta
-# libre. En re-syncs, la NetworkPolicy allow-mongodb-init lo deja pasar.
-# hook-delete-policy BeforeHookCreation → el Job viejo se borra justo
-# antes del siguiente sync (más robusto que HookSucceeded, que puede
-# dejar a ArgoCD esperando un hook ya borrado).
-# ═══════════════════════════════════════════════════════════════════
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -28,9 +11,6 @@ spec:
   backoffLimit: 4
   template:
     metadata:
-      # El label app=mongodb-init en el POD (no solo en el Job) es lo que
-      # matchea la NetworkPolicy allow-mongodb-init. Sin esto, default-deny
-      # bloquea al pod y el Job se cuelga esperando a mongo.
       labels: { app: mongodb-init }
     spec:
       restartPolicy: OnFailure
@@ -113,8 +93,6 @@ spec:
               done
 
               echo "[init] Crear usuarios (idempotente, vía localhost exception O auth root)..."
-              # Primero intentamos crear root vía localhost exception (sin auth)
-              # Si falla porque ya existe, intentamos con auth
               mongosh --host "$M0" --quiet <<EOF || true
               db = db.getSiblingDB('admin');
               try {
@@ -125,7 +103,6 @@ spec:
               }
               EOF
 
-              # Después usuarios app/worker (require auth de root)
               mongosh --host "$M0" --quiet \
                 -u "${MONGO_ROOT_USER}" -p "${MONGO_ROOT_PASS}" \
                 --authenticationDatabase admin <<EOF

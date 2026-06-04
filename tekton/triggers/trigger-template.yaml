@@ -1,11 +1,3 @@
-# TriggerTemplate: la "plantilla" del PipelineRun que se crea en cada push.
-#
-# Es el equivalente automático de hacer `kubectl create -f pipelinerun-dockerhub.yaml`
-# a mano — pero con el commit exacto que disparó el webhook, y con el DOBLE PUSH
-# (registry local + Docker Hub) ya activado.
-#
-# generateName → cada push produce un PipelineRun nuevo con sufijo único, así
-# que el historial de builds queda trazable (un objeto por push).
 apiVersion: triggers.tekton.dev/v1beta1
 kind: TriggerTemplate
 metadata:

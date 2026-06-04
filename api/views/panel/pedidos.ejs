@@ -3,8 +3,6 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Titulo estatico: el panel es SPA-lite, el JS hidrata negocio/usuario
-         con el JWT de localStorage (no hay datos server-side en el render). -->
     <title>Pedidos — Panel ZUYU</title>
     <link rel="stylesheet" href="/css/panel.css" />
     <script defer src="/js/panel-pedidos.js"></script>
@@ -36,7 +34,6 @@
         <a href="/panel/integracion" class="panel-nav__link">Integración</a>
       </nav>
 
-      <!-- Stats -->
       <div class="panel-stats">
         <div class="panel-stat">
           <p class="panel-stat__label">Pendientes</p>
@@ -60,7 +57,6 @@
         </div>
       </div>
 
-      <!-- Lista de pedidos -->
       <section class="panel-pedidos">
         <div class="panel-pedidos__header">
           <h2>Pedidos recientes</h2>
@@ -110,7 +106,6 @@
       </section>
     </main>
 
-    <!-- Modal de detalle -->
     <div x-show="selected" x-cloak class="modal-overlay" @click="selected = null">
       <div @click.stop class="pedido-detalle">
         <template x-if="selected">
@@ -164,10 +159,30 @@
               <p class="pedido-detalle__total" x-text="'Total: $' + selected.total.toFixed(2)"></p>
             </div>
 
-            <template x-if="selected.delivery && selected.delivery.trackingUrl">
+            <template x-if="selected.delivery && (selected.delivery.proveedor || selected.delivery.trackingUrl || (selected.delivery.repartidor && (selected.delivery.repartidor.nombre || selected.delivery.repartidor.telefono)))">
               <div class="pedido-detalle__section">
                 <h3>Tracking del repartidor</h3>
-                <p><a :href="selected.delivery.trackingUrl" target="_blank">Ver en vivo →</a></p>
+                <p x-show="selected.delivery.proveedor">
+                  Proveedor: <span x-text="carrierLabel(selected.delivery.proveedor)"></span>
+                </p>
+                <p x-show="selected.delivery.repartidor && selected.delivery.repartidor.nombre">
+                  Repartidor: <span x-text="selected.delivery.repartidor.nombre"></span>
+                </p>
+                <p x-show="selected.delivery.repartidor && selected.delivery.repartidor.telefono">
+                  📞
+                  <a
+                    :href="'tel:' + (selected.delivery.repartidor ? selected.delivery.repartidor.telefono : '')"
+                    x-text="selected.delivery.repartidor ? selected.delivery.repartidor.telefono : ''"
+                  ></a>
+                </p>
+                <p x-show="selected.delivery.trackingUrl">
+                  <a
+                    :href="trackUrlSeguro(selected.delivery.trackingUrl)"
+                    target="_blank"
+                    rel="noopener"
+                    >Ver en vivo →</a
+                  >
+                </p>
               </div>
             </template>
 

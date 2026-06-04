@@ -54,3 +54,4 @@ secrets/
 
 # Tekton local runs
 .tekton-cache/
+demos/.zuyu-dev-credentials

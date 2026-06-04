@@ -7,7 +7,7 @@ metadata:
     app: worker
     component: backend
 spec:
-  replicas: 1 # KEDA escala desde 1 hasta 5 segun cola Redis
+  replicas: 1
   strategy:
     type: RollingUpdate
   selector:
@@ -21,7 +21,7 @@ spec:
     spec:
       serviceAccountName: worker-sa
       automountServiceAccountToken: false
-      terminationGracePeriodSeconds: 60 # mas tiempo para terminar jobs en curso
+      terminationGracePeriodSeconds: 60
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -39,7 +39,7 @@ spec:
               protocol: TCP
           envFrom:
             - secretRef:
-                name: api-env # mismo secret que el API (comparten Redis y Mongo)
+                name: api-env
           env:
             - name: NODE_ENV
               value: production
@@ -54,8 +54,6 @@ spec:
             limits:
               cpu: 300m
               memory: 256Mi
-          # No livenessProbe HTTP porque worker no expone HTTP
-          # En su lugar usamos exec probe que verifica conexion Redis
           livenessProbe:
             exec:
               command: ['sh', '-c', "ps aux | grep -v grep | grep -q 'node index.js' || exit 1"]

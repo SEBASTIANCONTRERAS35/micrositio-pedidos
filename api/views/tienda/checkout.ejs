@@ -47,7 +47,6 @@
           Revisa los productos y completa tus datos para que te llegue a domicilio.
         </p>
 
-        <!-- Resumen del carrito -->
         <section class="checkout-card">
           <h3 class="checkout-card__title">Tu pedido</h3>
           <template x-if="items.length === 0">
@@ -83,7 +82,6 @@
           </div>
         </section>
 
-        <!-- Formulario de datos del cliente -->
         <section class="checkout-card" x-show="items.length > 0" x-cloak>
           <h3 class="checkout-card__title">Tus datos</h3>
           <form @submit.prevent="submit">

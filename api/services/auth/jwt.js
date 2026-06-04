@@ -1,13 +1,3 @@
-/**
- * JWT con RS256 + refresh tokens en Redis
- *
- * Flujo:
- * 1. Login -> emite accessToken (15 min) + refreshToken (7 dias)
- * 2. Cliente usa accessToken en header Authorization
- * 3. Cuando expira, cliente usa refreshToken para obtener uno nuevo
- * 4. refreshToken se invalida y se emite uno nuevo (rotation)
- * 5. Tokens revocados van a blacklist en Redis con TTL = vida del token
- */
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -15,12 +5,12 @@ const redis = require('../redis');
 const { AuthenticationError } = require('../../utils/errors');
 
 const ACCESS_TTL = process.env.JWT_ACCESS_TOKEN_TTL || '15m';
-const REFRESH_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 dias
+const REFRESH_TTL_SECONDS = 7 * 24 * 60 * 60;
 
-// Cargar claves desde archivos (montados como Secret en K8s)
 let privateKey;
 let publicKey;
 
+// Carga las claves RSA desde archivos o variables de entorno
 function loadKeys() {
   const privatePath = process.env.JWT_PRIVATE_KEY_PATH;
   const publicPath = process.env.JWT_PUBLIC_KEY_PATH;
@@ -30,7 +20,6 @@ function loadKeys() {
   } else if (process.env.JWT_PRIVATE_KEY) {
     privateKey = process.env.JWT_PRIVATE_KEY;
   } else {
-    // Fallback dev only: generar par efimero
     if (process.env.NODE_ENV === 'production') {
       throw new Error('JWT_PRIVATE_KEY_PATH o JWT_PRIVATE_KEY requerido en produccion');
     }
@@ -55,23 +44,24 @@ function loadKeys() {
 
 loadKeys();
 
+// Firma un access token RS256 con jti unico y expiracion
 function signAccessToken(payload) {
   return jwt.sign(payload, privateKey, {
     algorithm: 'RS256',
     expiresIn: ACCESS_TTL,
     issuer: 'micrositio-api',
-    // jti unico por token — SIN esto isAccessTokenRevoked() nunca puede
-    // funcionar (payload.jti seria undefined) y la blacklist es inutil.
     jwtid: crypto.randomBytes(16).toString('hex'),
   });
 }
 
+// Emite un refresh token y lo guarda en Redis con TTL
 async function issueRefreshToken(userId) {
   const token = crypto.randomBytes(32).toString('hex');
   await redis.set(`refresh:${token}`, userId, 'EX', REFRESH_TTL_SECONDS);
   return token;
 }
 
+// Rota un refresh token: invalida el viejo y emite uno nuevo
 async function rotateRefreshToken(oldToken) {
   const userId = await redis.get(`refresh:${oldToken}`);
   if (!userId) {
@@ -81,10 +71,12 @@ async function rotateRefreshToken(oldToken) {
   return { userId, newToken: await issueRefreshToken(userId) };
 }
 
+// Revoca un refresh token borrandolo de Redis
 async function revokeRefreshToken(token) {
   await redis.del(`refresh:${token}`);
 }
 
+// Verifica un access token RS256 y devuelve su payload
 function verifyAccessToken(token) {
   try {
     return jwt.verify(token, publicKey, { algorithms: ['RS256'] });
@@ -93,6 +85,7 @@ function verifyAccessToken(token) {
   }
 }
 
+// Indica si un access token esta revocado segun su jti en la blacklist
 async function isAccessTokenRevoked(jti) {
   if (!jti) {
     return false;
@@ -101,14 +94,7 @@ async function isAccessTokenRevoked(jti) {
   return existe === 1;
 }
 
-/**
- * Revoca un access token por su jti (lo mete en la blacklist de Redis).
- * El TTL = tiempo que le queda de vida al token: no tiene sentido guardar
- * la entrada de blacklist mas alla de la expiracion natural del token.
- *
- * @param {string} jti - el jti del token
- * @param {number} expiresAtUnix - claim `exp` del token (segundos Unix)
- */
+// Revoca un access token por su jti metiendolo en la blacklist de Redis
 async function revokeAccessToken(jti, expiresAtUnix) {
   if (!jti) {
     return;

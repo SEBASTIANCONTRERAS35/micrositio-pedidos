@@ -1,12 +1,3 @@
-/**
- * Prometheus metrics — exposes /metrics for kube-prometheus-stack scraping.
- *
- * Métricas:
- *  - http_requests_total{method,route,status}      counter
- *  - http_request_duration_seconds{method,route}   histogram (buckets default)
- *  - pedidos_total{estado}                         counter (custom, opcional)
- *  - default Node.js metrics (memory, GC, event loop)
- */
 'use strict';
 
 const promClient = require('prom-client');
@@ -37,7 +28,7 @@ const pedidosTotal = new promClient.Counter({
   registers: [register],
 });
 
-// Middleware Express — mide cada request
+// Middleware Express que mide la duracion y cuenta cada request HTTP.
 function middleware(req, res, next) {
   const inicio = process.hrtime.bigint();
   res.on('finish', () => {
@@ -50,7 +41,7 @@ function middleware(req, res, next) {
   next();
 }
 
-// Endpoint /metrics
+// Handler del endpoint /metrics que expone las metricas en formato Prometheus.
 async function handler(req, res) {
   res.set('Content-Type', register.contentType);
   res.end(await register.metrics());

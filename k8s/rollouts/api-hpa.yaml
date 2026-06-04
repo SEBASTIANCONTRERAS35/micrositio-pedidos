@@ -1,5 +1,3 @@
-# HorizontalPodAutoscaler para el Rollout del api (NO Deployment — daniel literal Día 19).
-# Escala 2-5 réplicas según CPU promedio > 70%. KEDA-style scaling para el worker existe aparte.
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -8,7 +6,7 @@ metadata:
   labels: { app: api }
 spec:
   scaleTargetRef:
-    apiVersion: argoproj.io/v1alpha1 # ← apunta al Rollout, NO al Deployment
+    apiVersion: argoproj.io/v1alpha1
     kind: Rollout
     name: api
   minReplicas: 2

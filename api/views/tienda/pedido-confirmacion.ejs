@@ -6,8 +6,19 @@
     <title>Pedido confirmado — <%= negocio.nombre %></title>
     <link rel="stylesheet" href="/css/tienda.css" />
     <link rel="stylesheet" href="/css/checkout.css" />
+    <style>
+      .is-oculto {
+        display: none !important;
+      }
+    </style>
+    <script defer src="/js/tracking.js"></script>
   </head>
-  <body data-type="<%= negocio.tipo %>">
+  <body
+    data-type="<%= negocio.tipo %>"
+    data-pedido-id="<%= pedido.pedidoId %>"
+    data-pedido-estado="<%= pedido.estado %>"
+    data-negocio-slug="<%= negocio.slug %>"
+  >
     <main class="confirmacion-main">
       <div class="confirmacion-card">
         <div class="confirmacion-icon">✓</div>
@@ -32,6 +43,65 @@
           <div class="confirmacion-total">
             <span>Total</span>
             <span>$<%= pedido.total.toFixed(2) %></span>
+          </div>
+        </div>
+
+        <% const ETAPAS = ['pendiente', 'confirmado', 'en_camino', 'entregado']; const ETIQUETAS = {
+        pendiente: 'Pendiente', confirmado: 'Confirmado', en_camino: 'En camino', entregado:
+        'Entregado', cancelado: 'Cancelado', }; const indiceActual = ETAPAS.indexOf(pedido.estado);
+        const delivery = pedido.delivery || null; const repartidor = delivery && delivery.repartidor
+        ? delivery.repartidor : null; const tieneRepartidor = !!(repartidor && repartidor.nombre);
+        const trackingUrl = delivery && /^https?:\/\//i.test(delivery.trackingUrl || '') ?
+        delivery.trackingUrl : null; const claseDelivery = 'tracking-delivery' + (!tieneRepartidor &&
+        !trackingUrl ? ' is-oculto' : ''); const claseTracking = 'tracking-delivery__btn' +
+        (trackingUrl ? '' : ' is-oculto'); %>
+
+        <div class="confirmacion-seguimiento">
+          <h3>Seguimiento</h3>
+          <span class="tracking-badge tracking-badge--<%= pedido.estado %>" data-tracking-estado
+            ><%= ETIQUETAS[pedido.estado] || pedido.estado %></span
+          >
+
+          <ol class="tracking-timeline">
+            <% for (const etapa of ETAPAS) { %> <% const idx = ETAPAS.indexOf(etapa); let cls =
+            'tracking-timeline__step'; if (pedido.estado === 'cancelado') { cls += ' is-cancelled';
+            } else if (idx < indiceActual) { cls += ' is-done'; } else if (idx === indiceActual) {
+            cls += ' is-active'; } %>
+            <li class="<%= cls %>" data-tracking-step="<%= etapa %>">
+              <span class="tracking-timeline__dot"></span>
+              <span class="tracking-timeline__label"><%= ETIQUETAS[etapa] %></span>
+            </li>
+            <% } %>
+          </ol>
+
+          <ul class="tracking-historial" data-tracking-historial>
+            <% for (const h of (pedido.historial || [])) { %>
+            <li class="tracking-historial__item">
+              <span class="tracking-historial__estado"><%= ETIQUETAS[h.estado] || h.estado %></span>
+              <% if (h.nota) { %>
+              <span class="tracking-historial__nota"><%= h.nota %></span>
+              <% } %>
+              <time class="tracking-historial__fecha"
+                ><%= h.timestamp ? new Date(h.timestamp).toLocaleString('es-MX', { day: '2-digit',
+                month: 'short', hour: '2-digit', minute: '2-digit' }) : '' %></time
+              >
+            </li>
+            <% } %>
+          </ul>
+
+          <div class="<%= claseDelivery %>" data-tracking-delivery>
+            <h4>Tu repartidor</h4>
+            <p class="tracking-delivery__nombre" data-tracking-repartidor-nombre>
+              <%= (repartidor && repartidor.nombre) ? repartidor.nombre : 'Repartidor asignado' %>
+            </p>
+            <a
+              class="<%= claseTracking %>"
+              data-tracking-url
+              href="<%= trackingUrl || '#' %>"
+              target="_blank"
+              rel="noopener"
+              >Rastrear en vivo →</a
+            >
           </div>
         </div>
 

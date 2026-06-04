@@ -1,6 +1,3 @@
-/**
- * Modelo Producto del catalogo del negocio
- */
 const mongoose = require('mongoose');
 
 const productoSchema = new mongoose.Schema(
@@ -11,9 +8,6 @@ const productoSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    // ID_PRODUCTO de ZUYU — correlaciona este producto local con el de ZUYU.
-    // Solo presente cuando ZUYU_MOCK=false (integracion activa). En modo
-    // standalone el producto vive solo en el micrositio y este campo es null.
     zuyuProductoId: { type: String, default: null, index: true },
     nombre: { type: String, required: true, trim: true, maxlength: 200 },
     descripcion: { type: String, trim: true, maxlength: 1000 },
@@ -28,7 +22,6 @@ const productoSchema = new mongoose.Schema(
 
 productoSchema.index({ negocioId: 1, categoria: 1 });
 productoSchema.index({ negocioId: 1, nombre: 'text' });
-// Lookup rapido por id de ZUYU durante la sincronizacion
 productoSchema.index({ negocioId: 1, zuyuProductoId: 1 }, { sparse: true });
 
 module.exports = mongoose.model('Producto', productoSchema);

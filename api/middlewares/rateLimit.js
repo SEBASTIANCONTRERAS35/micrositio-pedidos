@@ -1,7 +1,3 @@
-/**
- * Rate limiting con backend Redis
- * Distribuido entre replicas del API
- */
 const { RateLimiterRedis } = require('rate-limiter-flexible');
 const redis = require('../services/redis');
 const { RateLimitError } = require('../utils/errors');
@@ -23,21 +19,19 @@ const limiterWebhook = new RateLimiterRedis({
 const limiterAuth = new RateLimiterRedis({
   storeClient: redis,
   keyPrefix: 'rl:auth',
-  points: 10, // 10 intentos de login
-  duration: 60 * 15, // por 15 min
-  blockDuration: 60 * 60, // bloquea 1 hora si se excede
+  points: 10,
+  duration: 60 * 15,
+  blockDuration: 60 * 60,
 });
 
-// Endpoints sensibles que no son login: refresh y logout. Mas permisivo que
-// el login (los refresh tokens son de 256 bits, fuerza bruta inviable) pero
-// igual acotado para que no se puedan martillar.
 const limiterSensitive = new RateLimiterRedis({
   storeClient: redis,
   keyPrefix: 'rl:sensitive',
-  points: 30, // 30 req
-  duration: 60, // por minuto
+  points: 30,
+  duration: 60,
 });
 
+// Crea un middleware de rate limit que consume puntos por IP
 function makeLimiter(limiter) {
   return async (req, res, next) => {
     try {

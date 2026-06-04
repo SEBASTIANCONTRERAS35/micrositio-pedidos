@@ -1,13 +1,3 @@
-# Ingress que expone el EventListener en tekton.zuyu.local.
-#
-# El EventListener crea un Service "el-micrositio-github-listener" (puerto 8080).
-# Este Ingress lo publica para que GitHub (o un curl de demo) pueda enviarle el
-# webhook. Mismo IngressClass nginx que zuyu.local / argocd.zuyu.local / grafana.
-#
-# ⚠️ Red: el cluster vive en la NAT de Parallels (10.211.55.x). GitHub desde
-# internet NO alcanza tekton.zuyu.local. Para la demo se dispara con un curl
-# firmado (HMAC) que simula el push de GitHub. Para webhook real de GitHub se
-# necesitaría un túnel (cloudflared/ngrok) — ver README del repo.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

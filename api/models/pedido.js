@@ -1,24 +1,7 @@
-/**
- * Modelo Pedido — CORE DEL PROYECTO
- *
- * Estados:
- *   pendiente   -> recien creado, esperando confirmacion del dueno
- *   confirmado  -> dueno confirmo, worker debe solicitar repartidor
- *   en_camino   -> repartidor recogio el pedido
- *   entregado   -> entrega confirmada
- *   cancelado   -> dueno cancelo o stock devuelto
- *
- * Snapshots:
- *   productos[] guarda nombre y precioUnitario en el momento del pedido
- *   (los precios pueden cambiar despues, el pedido conserva el original)
- */
 const mongoose = require('mongoose');
 
 const productoSnapshotSchema = new mongoose.Schema(
   {
-    // String para soportar BOTH: ObjectId del Mongo local (mock mode) Y
-    // SKUs de ZUYU como 'AVI-250' (modo conectado). Antes era ObjectId
-    // estricto y rompia con productos del catalogo de ZUYU.
     id: { type: String, required: true },
     nombre: { type: String, required: true },
     precioUnitario: { type: Number, required: true, min: 0 },
@@ -40,7 +23,7 @@ const clienteSchema = new mongoose.Schema(
 const deliverySchema = new mongoose.Schema(
   {
     proveedor: { type: String, enum: ['ivoy', 'lalamove', 'uberDirect', 'propio'] },
-    deliveryId: String, // id externo del proveedor
+    deliveryId: String,
     trackingUrl: String,
     estado: {
       type: String,
@@ -65,9 +48,6 @@ const pedidoSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
-    // Referencia estable que ve ZUYU (= Idempotency-Key del cliente cuando
-    // existe). En reintentos se reusa, asi ZUYU deduplica y no crea Ventas
-    // duplicadas. Sparse: los pedidos en modo mock no la tienen.
     referenciaExterna: {
       type: String,
       index: { sparse: true },
@@ -79,6 +59,7 @@ const pedidoSchema = new mongoose.Schema(
       index: true,
     },
     cliente: { type: clienteSchema, required: true },
+    // Valida que el pedido tenga al menos un producto
     productos: { type: [productoSnapshotSchema], required: true, validate: (v) => v.length > 0 },
     subtotal: { type: Number, required: true, min: 0 },
     costoEnvio: { type: Number, default: 0 },
@@ -107,7 +88,6 @@ const pedidoSchema = new mongoose.Schema(
   { timestamps: { createdAt: 'creadoEn', updatedAt: 'actualizadoEn' } }
 );
 
-// Auto-cleanup de pedidos cancelados despues de 90 dias (compliance + storage)
 pedidoSchema.index(
   { actualizadoEn: 1 },
   {

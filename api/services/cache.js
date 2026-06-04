@@ -1,14 +1,11 @@
-/**
- * Cache in-memory simple con TTL
- * Inspirado en el patron de PaginaWeb (cache 30 min para slug -> negocio)
- */
-
 class TTLCache {
+  // Inicializa el cache con un TTL por defecto en milisegundos
   constructor(defaultTTLMs = 30 * 60 * 1000) {
     this.cache = new Map();
     this.defaultTTL = defaultTTLMs;
   }
 
+  // Devuelve el valor de una clave o null si no existe o expiro
   get(key) {
     const entrada = this.cache.get(key);
     if (!entrada) {
@@ -21,6 +18,7 @@ class TTLCache {
     return entrada.value;
   }
 
+  // Guarda un valor con su tiempo de expiracion calculado segun el TTL
   set(key, value, ttlMs = null) {
     this.cache.set(key, {
       value,
@@ -28,20 +26,22 @@ class TTLCache {
     });
   }
 
+  // Elimina una clave del cache
   delete(key) {
     this.cache.delete(key);
   }
 
+  // Vacia por completo el cache
   clear() {
     this.cache.clear();
   }
 
+  // Devuelve la cantidad de entradas almacenadas
   size() {
     return this.cache.size;
   }
 }
 
-// Singleton para tienda (slug -> data)
 const tiendaCache = new TTLCache(30 * 60 * 1000);
 
 module.exports = { TTLCache, tiendaCache };

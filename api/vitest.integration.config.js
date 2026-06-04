@@ -3,7 +3,7 @@ module.exports = {
     environment: 'node',
     globals: true,
     include: ['tests/integration/**/*.test.js'],
-    testTimeout: 60000, // testcontainers tarda en levantar
+    testTimeout: 60000,
     hookTimeout: 60000,
   },
 };

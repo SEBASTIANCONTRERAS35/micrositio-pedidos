@@ -1,7 +1,4 @@
-/**
- * Pantalla de integracion con ZUYU (panel/integracion.ejs).
- * Externalizado del EJS para poder quitar 'unsafe-inline' del CSP de scripts.
- */
+// Pantalla de integracion con ZUYU (componente Alpine del panel).
 function integracionZuyu() {
   return {
     loading: true,
@@ -18,10 +15,12 @@ function integracionZuyu() {
     },
     form: { baseUrl: '', apiKey: '', webhookSecret: '', conectado: false },
 
+    // Devuelve el token de sesion guardado en localStorage.
     token() {
       return localStorage.getItem('panel_token');
     },
 
+    // Carga datos del usuario/negocio y el estado de la integracion.
     async load() {
       const t = this.token();
       if (!t) {
@@ -29,7 +28,6 @@ function integracionZuyu() {
         return;
       }
       try {
-        // Datos del usuario/negocio para el header
         const meRes = await fetch('/panel/api/me', {
           headers: { Authorization: 'Bearer ' + t },
         });
@@ -43,7 +41,6 @@ function integracionZuyu() {
           this.usuario = me.usuario || this.usuario;
         }
 
-        // Estado de la integracion
         const respuesta = await fetch('/panel/api/integracion', {
           headers: { Authorization: 'Bearer ' + t },
         });
@@ -61,12 +58,11 @@ function integracionZuyu() {
       }
     },
 
+    // Guarda la configuracion de integracion y refresca el estado.
     async guardar() {
       this.saving = true;
       this.msg = '';
       try {
-        // Solo mandamos apiKey/webhookSecret si el usuario escribió algo —
-        // vacío significa "no cambiar".
         const payload = {
           baseUrl: this.form.baseUrl.trim(),
           conectado: this.form.conectado,
@@ -90,7 +86,6 @@ function integracionZuyu() {
         if (!respuesta.ok) {
           throw new Error(datos.message || 'No se pudo guardar');
         }
-        // Refrescar estado y limpiar los campos de secreto
         this.estado = datos;
         this.form.baseUrl = datos.baseUrl || '';
         this.form.conectado = datos.conectado || false;
@@ -108,6 +103,7 @@ function integracionZuyu() {
       }
     },
 
+    // Cierra la sesion y redirige al login del panel.
     logout() {
       localStorage.removeItem('panel_token');
       window.location.href = '/panel/login';
