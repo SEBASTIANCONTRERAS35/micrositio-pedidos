@@ -1,8 +1,3 @@
-/**
- * iVoy provider
- * Sandbox publico: usuario integracion-express@ivoy.mx / pass sandbox
- * Doc: http://docs.ivoy.mx/express/
- */
 const { verifyHmacSignature, isTimestampValid } = require('../../../utils/hmac');
 const logger = require('../../../utils/logger');
 const { construirOrigenEnvio } = require('../../../domain/envio');
@@ -10,12 +5,12 @@ const { construirOrigenEnvio } = require('../../../domain/envio');
 const BASE_URL = process.env.IVOY_BASE_URL || 'https://sandbox.ivoy.mx/api';
 const IS_MOCK = process.env.IVOY_MOCK === 'true';
 
+// Crea una orden de envio en iVoy y devuelve datos del delivery.
 async function requestDelivery(pedido, negocio) {
   if (IS_MOCK) {
     return mockResponse(pedido);
   }
 
-  // Llamada real al sandbox de iVoy
   const autenticacion = Buffer.from(
     `${process.env.IVOY_USER}:${process.env.IVOY_PASSWORD}`
   ).toString('base64');
@@ -55,6 +50,7 @@ async function requestDelivery(pedido, negocio) {
   };
 }
 
+// Consulta el estado actual de una orden de envio en iVoy.
 async function getStatus(deliveryId) {
   if (IS_MOCK) {
     return { estado: 'pickup' };
@@ -75,13 +71,11 @@ async function getStatus(deliveryId) {
   return { estado: mapEstado(datos.status) };
 }
 
+// Cancela una orden de envio en iVoy y devuelve ok segun el status real.
 async function cancelDelivery(deliveryId) {
   if (IS_MOCK) {
     return { ok: true };
   }
-  // iVoy Express: cancelación de una orden. Si el sandbox no expone el
-  // endpoint (404/405/501), devolvemos ok:false con el status real — el
-  // caller decide, sin asumir éxito ciego. encodeURIComponent: defensa de path.
   const autenticacion = Buffer.from(
     `${process.env.IVOY_USER}:${process.env.IVOY_PASSWORD}`
   ).toString('base64');
@@ -98,15 +92,12 @@ async function cancelDelivery(deliveryId) {
   return { ok: true };
 }
 
-/**
- * iVoy no documenta firma HMAC publica.
- * Para el proyecto universitario aceptamos un token compartido en header.
- */
+// Verifica el webhook de iVoy mediante token/firma HMAC compartido.
 function verifyWebhook(body, headers) {
   const secret = process.env.WEBHOOK_SECRET_IVOY;
   if (!secret) {
     logger.warn('WEBHOOK_SECRET_IVOY no configurado, webhooks no verificados');
-    return true; // dev only
+    return true;
   }
 
   const signature = headers['x-ivoy-signature'];
@@ -118,6 +109,7 @@ function verifyWebhook(body, headers) {
   return verifyHmacSignature(body, signature, secret);
 }
 
+// Normaliza el cuerpo del webhook de iVoy a la forma interna del delivery.
 function parseWebhook(body) {
   return {
     deliveryId: body.orderId || body.id,
@@ -126,6 +118,7 @@ function parseWebhook(body) {
   };
 }
 
+// Mapea los estados de iVoy a los estados internos del sistema.
 function mapEstado(ivoyStatus) {
   const map = {
     accepted: 'pending',
@@ -138,6 +131,7 @@ function mapEstado(ivoyStatus) {
   return map[ivoyStatus] || 'pending';
 }
 
+// Genera una respuesta simulada de delivery para el modo mock.
 function mockResponse(pedido) {
   return {
     deliveryId: `ivoy-mock-${pedido.pedidoId}`,

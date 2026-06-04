@@ -1,20 +1,3 @@
-/**
- * API + servidor web del micrositio de pedidos
- *
- * Stack:
- *  - Express 5 + EJS para vistas
- *  - MongoDB (Replica Set) via Mongoose
- *  - Redis para cache, idempotencia, rate limiting, blacklist JWT
- *  - BullMQ para encolar jobs al worker
- *
- * Seguridad baseline:
- *  - Helmet con CSP
- *  - Rate limiting con backend Redis
- *  - Sanitizacion mongo y HPP
- *  - Validacion Zod en todo input
- *  - JWT RS256 + refresh rotation
- *  - Logs PII-redacted con Pino
- */
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
@@ -39,20 +22,14 @@ const webhooksRoutes = require('./routes/webhooks');
 
 const app = express();
 
-// ── Trust proxy (estamos detras de nginx-ingress) ──
 app.set('trust proxy', 1);
 
-// ── View engine ──
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// ── Middlewares globales ──
 app.use(helmetMw);
 app.use(
   cors({
-    // Sin CORS_ORIGIN configurado: NO permitir cross-origin. El micrositio
-    // sirve sus propias paginas same-origin; no hay consumidor cross-origin
-    // legitimo. `|| true` reflejaba cualquier origen — eso se quita.
     origin: process.env.CORS_ORIGIN || false,
     credentials: false,
   })
@@ -61,7 +38,6 @@ app.use(compression());
 app.use(pinoHttp({ logger }));
 app.use(metricsMw.middleware);
 
-// ── Body parsers (excluir webhooks que necesitan raw) ──
 app.use((req, res, next) => {
   if (req.path.startsWith('/webhooks/')) {
     return next();
@@ -77,17 +53,12 @@ app.use((req, res, next) => {
 app.use(mongoSanitize);
 app.use(hpp());
 
-// ── Static assets ──
-// En dev: sin cache (para que cambios en CSS/JS se vean al instante)
-// En prod: cache de 1 dia (los assets cambian de path con hash o versionado del Tekton build)
 const staticMaxAge = process.env.NODE_ENV === 'production' ? '1d' : 0;
 app.use('/css', express.static(path.join(__dirname, 'public/css'), { maxAge: staticMaxAge }));
 app.use('/js', express.static(path.join(__dirname, 'public/js'), { maxAge: staticMaxAge }));
 
-// ── Metrics endpoint (Prometheus scraping) ──
 app.get('/metrics', metricsMw.handler);
 
-// ── Routes ──
 app.use('/health', healthRoutes);
 app.use('/tienda', tiendaRoutes);
 app.use('/api/pedidos', pedidosRoutes);
@@ -96,16 +67,13 @@ app.use('/panel', panelRoutes);
 app.use('/api/panel', panelRoutes);
 app.use('/webhooks', webhooksRoutes);
 
-// ── Root redirect ──
 app.get('/', (req, res) => res.redirect('/health/live'));
 
-// ── 404 ──
 app.use((req, res) => res.status(404).render('tienda/404', { mensaje: 'Pagina no encontrada' }));
 
-// ── Error handler (siempre al final) ──
 app.use(errorHandler);
 
-// ── Conexion a MongoDB y arranque ──
+// Conecta a MongoDB y arranca el servidor HTTP
 async function start() {
   try {
     const mongoUri = process.env.MONGODB_URI;
@@ -128,7 +96,7 @@ async function start() {
   }
 }
 
-// Graceful shutdown
+// Cierra mongoose y termina el proceso ante una senal
 async function shutdown(signal) {
   logger.info({ signal }, 'Cerrando servidor...');
   try {
@@ -150,5 +118,3 @@ if (require.main === module) {
 }
 
 module.exports = app;
-
-// ci-demo-marker: 232623

@@ -1,11 +1,6 @@
-/**
- * Tests del colector de profundidad de cola (worker/metrics.js).
- * sampleQueueDepth alimenta el gauge worker_queue_pending que consume la
- * alerta QueueBacklogHigh. describe/it/expect son globales (vitest config).
- */
 const { register, sampleQueueDepth } = require('../../metrics');
 
-/** Queue falso: getJobCounts devuelve los conteos que le pasemos. */
+// Crea un queue falso cuyo getJobCounts devuelve los conteos dados.
 function fakeQueue(name, counts) {
   return { name, getJobCounts: async () => counts };
 }
@@ -26,6 +21,7 @@ describe('sampleQueueDepth — gauge worker_queue_pending', () => {
   it('no lanza si getJobCounts falla (Redis caido) — las métricas nunca tumban el worker', async () => {
     const badQueue = {
       name: 'sync-zuyu',
+      // Simula fallo de Redis lanzando un error de conexion.
       getJobCounts: async () => {
         throw new Error('ECONNREFUSED');
       },

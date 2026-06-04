@@ -1,8 +1,3 @@
-# ═══════════════════════════════════════════════════════════════════
-# Namespace 'micrositio' con Pod Security Standards: Baseline
-# NOTA: baseline (no restricted) porque mongodb init-container necesita
-# root + CHOWN para preparar el keyfile de replica set authentication.
-# ═══════════════════════════════════════════════════════════════════
 apiVersion: v1
 kind: Namespace
 metadata:

@@ -1,5 +1,3 @@
-# Helm values para chart 'loki' (NO loki-stack que esta deprecado)
-# Modo SingleBinary para simplicidad en cluster pequeño
 deploymentMode: SingleBinary
 
 loki:
@@ -18,7 +16,7 @@ loki:
           prefix: loki_index_
           period: 24h
   limits_config:
-    retention_period: 168h  # 7 dias
+    retention_period: 168h
     max_query_length: 0h
     max_streams_per_user: 0
     ingestion_rate_mb: 16
@@ -36,7 +34,6 @@ singleBinary:
     storageClass: nfs-csi
     size: 10Gi
 
-# Desactivar componentes no necesarios en SingleBinary
 read: { replicas: 0 }
 write: { replicas: 0 }
 backend: { replicas: 0 }

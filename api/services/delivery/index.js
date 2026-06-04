@@ -1,7 +1,3 @@
-/**
- * Capa de abstraccion multi-carrier
- * Daniel acepta mocks; en produccion ZUYU usaria los providers reales
- */
 const ivoy = require('./providers/ivoy');
 const lalamove = require('./providers/lalamove');
 const uberDirect = require('./providers/uberDirect');
@@ -9,6 +5,7 @@ const logger = require('../../utils/logger');
 
 const providers = { ivoy, lalamove, uberDirect };
 
+// Obtiene el provider de delivery por nombre o lanza error si no existe
 function getProvider(name) {
   const proveedor = providers[name];
   if (!proveedor) {
@@ -17,16 +14,10 @@ function getProvider(name) {
   return proveedor;
 }
 
-/**
- * Selecciona el carrier óptimo según la ciudad del negocio (bonus multi-carrier).
- * Reglas:
- *   - CDMX / EdoMex        → iVoy (cobertura local, tarifa baja)
- *   - Guadalajara/Monterrey → Lalamove (mejor cobertura ZMM)
- *   - Otras (nacional)     → Uber Direct (68 ciudades)
- * Si el negocio tiene `deliveryProvider` explícito en BD, ese gana (override).
- */
+// Selecciona el carrier optimo: override explicito del negocio o por ciudad
 function selectProviderByCity(negocio) {
-  if (negocio?.deliveryProvider) {
+  // Override por campo: si el negocio fija un carrier (no "auto"), se respeta.
+  if (negocio?.deliveryProvider && negocio.deliveryProvider !== 'auto') {
     return negocio.deliveryProvider;
   }
   const ciudad = (negocio?.direccion?.ciudad || '').toLowerCase();
@@ -39,36 +30,29 @@ function selectProviderByCity(negocio) {
   return 'uberDirect';
 }
 
-/**
- * Solicita un repartidor al carrier indicado
- * @param {string} providerName - 'ivoy' | 'lalamove' | 'uberDirect'
- * @param {object} pedido - documento del pedido
- * @returns {object} { deliveryId, trackingUrl, estado, costoEnvio }
- */
+// Solicita un repartidor al carrier indicado
 async function requestDelivery(providerName, pedido) {
   const proveedor = getProvider(providerName);
   logger.info({ pedidoId: pedido.pedidoId, providerName }, 'Solicitando repartidor');
   return proveedor.requestDelivery(pedido);
 }
 
+// Consulta el estado de un delivery en el carrier indicado
 async function getStatus(providerName, deliveryId) {
   return getProvider(providerName).getStatus(deliveryId);
 }
 
+// Cancela un delivery en el carrier indicado
 async function cancelDelivery(providerName, deliveryId) {
   return getProvider(providerName).cancelDelivery(deliveryId);
 }
 
-/**
- * Verifica firma de un webhook entrante segun el provider
- */
+// Verifica firma de un webhook entrante segun el provider
 function verifyWebhook(providerName, body, headers) {
   return getProvider(providerName).verifyWebhook(body, headers);
 }
 
-/**
- * Parsea webhook entrante a formato comun: { deliveryId, estado, repartidor }
- */
+// Parsea webhook entrante a formato comun
 function parseWebhook(providerName, body) {
   return getProvider(providerName).parseWebhook(body);
 }

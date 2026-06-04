@@ -1,7 +1,3 @@
-# ═══════════════════════════════════════════════════════════════════
-# ResourceQuota para el namespace 'micrositio'
-# Limita CPU/RAM total del namespace para gobernanza del cluster compartido
-# ═══════════════════════════════════════════════════════════════════
 apiVersion: v1
 kind: ResourceQuota
 metadata:
@@ -9,20 +5,16 @@ metadata:
   namespace: micrositio
 spec:
   hard:
-    # Compute
     requests.cpu: "4"
     requests.memory: 8Gi
     limits.cpu: "8"
     limits.memory: 16Gi
 
-    # Pods
     pods: "20"
 
-    # Storage
     persistentvolumeclaims: "10"
     requests.storage: 50Gi
 
-    # Other
     secrets: "20"
     configmaps: "20"
     services: "10"

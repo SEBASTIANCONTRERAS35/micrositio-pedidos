@@ -1,13 +1,3 @@
-# Pipeline CI del micrositio — clona el repo y construye+publica las dos
-# imágenes (api y worker). El destino PRINCIPAL es el registry local (lo que
-# el cluster realmente pullea para desplegar). Opcionalmente, en la MISMA
-# corrida de Kaniko, también empuja a un mirror en Docker Hub (vitrina pública
-# verificable). ArgoCD detecta la imagen nueva del local y despliega
-# (git push → build → deploy automático).
-#
-# Aplicar:  kubectl apply -f tekton/tasks/ -f tekton/pipeline.yaml
-# Ejecutar (solo local):    kubectl create -f tekton/pipelinerun-example.yaml
-# Ejecutar (local + Hub):   kubectl create -f tekton/pipelinerun-dockerhub.yaml
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
@@ -23,9 +13,6 @@ spec:
       default: '10.211.55.30:30500/micrositio-api:latest'
     - name: image-worker
       default: '10.211.55.30:30500/micrositio-worker:latest'
-    # Mirrors opcionales en Docker Hub. Vacíos (default) = build local-only,
-    # comportamiento idéntico al original. Cada elemento es un flag completo
-    # "--destination=docker.io/usuario/repo:tag" que se pasa a Kaniko.
     - name: image-api-mirror
       type: array
       default: []
@@ -36,7 +23,6 @@ spec:
     - name: source
 
   tasks:
-    # 1. Checkout del repo
     - name: clone
       taskRef: { name: git-clone }
       workspaces:
@@ -45,7 +31,6 @@ spec:
         - { name: url, value: $(params.repo-url) }
         - { name: revision, value: $(params.revision) }
 
-    # 2. Build + push imagen API (local + mirror opcional)
     - name: build-api
       runAfter: [clone]
       taskRef: { name: kaniko-build }
@@ -58,7 +43,6 @@ spec:
         - name: extra-destinations
           value: ['$(params.image-api-mirror[*])']
 
-    # 3. Build + push imagen worker (secuencial: comparte el workspace RWO)
     - name: build-worker
       runAfter: [build-api]
       taskRef: { name: kaniko-build }

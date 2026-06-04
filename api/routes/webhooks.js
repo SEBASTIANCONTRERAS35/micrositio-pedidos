@@ -1,8 +1,3 @@
-/**
- * Webhooks
- *  - /webhooks/delivery: actualizaciones de carriers (Uber, Lalamove, iVoy)
- *  - /webhooks/zuyu: cambios de inventario desde ZUYU (sincronizacion)
- */
 const express = require('express');
 const { Queue } = require('bullmq');
 const delivery = require('../services/delivery');
@@ -30,12 +25,11 @@ const colaZuyu = new Queue('sync-zuyu', {
   },
 });
 
-// POST /webhooks/delivery
-// Body raw es necesario para verificar HMAC. Lo capturamos antes del json parser
 router.post(
   '/delivery',
   webhookLimiter,
   express.raw({ type: 'application/json', limit: '100kb' }),
+  // Verifica firma del carrier y encola el webhook de delivery con idempotencia
   async (req, res, next) => {
     try {
       const provider = req.query.provider || req.headers['x-provider'];
@@ -45,7 +39,6 @@ router.post(
 
       const rawBody = req.body.toString('utf8');
 
-      // Verificar firma
       const valida = delivery.verifyWebhook(provider, rawBody, req.headers);
       if (!valida) {
         throw new WebhookSignatureError();
@@ -54,8 +47,6 @@ router.post(
       const parseado = JSON.parse(rawBody);
       const event = delivery.parseWebhook(provider, parseado);
 
-      // Idempotencia: por deliveryId + estado evitamos procesar dos veces
-      // (el job en el worker hara el manejo final)
       logger.info(
         { provider, deliveryId: event.deliveryId, estado: event.estado },
         'Webhook recibido'
@@ -65,7 +56,6 @@ router.post(
         'process-webhook',
         { provider, event, receivedAt: Date.now() },
         {
-          // jobId garantiza idempotencia: BullMQ no acepta dos jobs con mismo id
           jobId: `${event.deliveryId}-${event.estado}`,
           removeOnComplete: 100,
           removeOnFail: 50,
@@ -79,31 +69,17 @@ router.post(
   }
 );
 
-// ═══════════════════════════════════════════════════════════════════
-// POST /webhooks/zuyu — eventos de inventario desde ZUYU
-//
-// Contrato (ZUYU/backend/publicApi):
-//   Header  X-Zuyu-Signature: t=<unix>,v1=<hmac>[,v0=<previo>]
-//   Header  X-Zuyu-Event-Id:  <uuid>  (idempotencia)
-//   Body    { eventId, eventType, negocioSlug, data }
-//   eventTypes: producto_creado | producto_actualizado | producto_eliminado
-//               | stock_actualizado | pedido_confirmado
-//
-// Seguridad: HMAC estilo Stripe + dual-secret (rotacion) + replay protection.
-// El secret es POR NEGOCIO (zuyuConfig.webhookSecret) — NUNCA un secret global.
-// ═══════════════════════════════════════════════════════════════════
 router.post(
   '/zuyu',
   webhookLimiter,
   express.raw({ type: 'application/json', limit: '50kb' }),
+  // Verifica HMAC por negocio del evento ZUYU y lo encola para sincronizar inventario
   async (req, res, next) => {
     try {
       const rawBody = req.body.toString('utf8');
       const signatureHeader = req.headers['x-zuyu-signature'];
       const eventIdHeader = req.headers['x-zuyu-event-id'];
 
-      // Parsear el body para saber QUE negocio — necesario para resolver su
-      // secret. La firma se verifica contra el rawBody crudo, no el parseado.
       let payload;
       try {
         payload = JSON.parse(rawBody);
@@ -118,13 +94,9 @@ router.post(
           .json({ error: 'INVALID_PAYLOAD', message: 'eventType y negocioSlug requeridos' });
       }
 
-      // Resolver el webhook secret DEL NEGOCIO que dice el payload. Verificar
-      // con ese secret ata negocioSlug a la firma: solo quien conoce el secret
-      // de ESE negocio puede firmar un evento valido para el.
       const cfg = await zuyu.resolverConfig(negocioSlug);
       const secrets = [cfg.webhookSecret, cfg.webhookSecretPrevio].filter(Boolean);
       if (secrets.length === 0) {
-        // Sin secret configurado: NUNCA aceptar el webhook sin verificar.
         logger.warn({ negocioSlug }, 'Webhook ZUYU rechazado: negocio sin webhook secret');
         throw new WebhookSignatureError('Webhook secret no configurado para este negocio');
       }
@@ -132,9 +104,6 @@ router.post(
         throw new WebhookSignatureError('Firma de webhook ZUYU invalida o expirada');
       }
 
-      // eventId del body o del header — jobId para idempotencia.
-      // BullMQ rechaza dos jobs con el mismo jobId => evento duplicado se
-      // procesa una sola vez.
       const idemId = eventId || eventIdHeader || `${negocioSlug}:${eventType}:${Date.now()}`;
 
       logger.info({ eventType, negocioSlug, eventId: idemId }, 'Webhook ZUYU recibido');

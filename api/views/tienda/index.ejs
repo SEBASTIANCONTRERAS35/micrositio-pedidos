@@ -18,7 +18,6 @@ negocio.nombre.charAt(0).toUpperCase() : '?'; const categoriaNames = Object.keys
     <script defer src="/js/alpine.min.js"></script>
   </head>
   <body data-type="<%= negocio.tipo %>" x-data="cartStore('<%= negocio.slug %>')">
-    <!-- HEADER -->
     <header class="ct-header" id="ct-top">
       <div class="ct-header__inner">
         <div class="ct-header__left">
@@ -75,7 +74,6 @@ negocio.nombre.charAt(0).toUpperCase() : '?'; const categoriaNames = Object.keys
       </div>
     </header>
 
-    <!-- CATEGORY NAV -->
     <% if (categoriaNames.length > 0) { %>
     <nav class="ct-cat-nav" aria-label="Categorias">
       <div class="ct-cat-nav__inner">
@@ -87,7 +85,6 @@ negocio.nombre.charAt(0).toUpperCase() : '?'; const categoriaNames = Object.keys
     </nav>
     <% } %>
 
-    <!-- INFO BAR -->
     <% if (negocio.horarios || (negocio.direccion && negocio.direccion.ciudad)) { %>
     <div class="ct-info-bar">
       <div class="ct-info-bar__inner">
@@ -148,7 +145,6 @@ negocio.nombre.charAt(0).toUpperCase() : '?'; const categoriaNames = Object.keys
     </div>
     <% } %>
 
-    <!-- PROMO BANNER -->
     <% if (promociones && promociones.length > 0) { %>
     <div class="ct-promo-banner">
       <div class="ct-promo-banner__inner">
@@ -164,7 +160,6 @@ negocio.nombre.charAt(0).toUpperCase() : '?'; const categoriaNames = Object.keys
     </div>
     <% } %>
 
-    <!-- MAIN CATALOG -->
     <main class="ct-main" id="ct-catalog">
       <div class="ct-main__inner">
         <% if (categoriaNames.length === 0) { %>
@@ -183,9 +178,7 @@ negocio.nombre.charAt(0).toUpperCase() : '?'; const categoriaNames = Object.keys
             >
           </div>
           <div class="ct-grid">
-            <% for (const prod of porCategoria[catNombre]) { %> <%# stock null/undefined = producto
-            no trackeado en ZUYU = stock ilimitado (vendible). Solo es "agotado" si es un numero <=
-            0. %> <% const sinLimite = prod.stock === null || prod.stock === undefined; %> <% const
+            <% for (const prod of porCategoria[catNombre]) { %> <% const sinLimite = prod.stock === null || prod.stock === undefined; %> <% const
             stockNum = sinLimite ? 9999 : prod.stock; %> <% const agotado = !sinLimite && prod.stock
             <= 0; %> <% const stockBajo = !sinLimite && prod.stock > 0 && prod.stock <= 5; %>
             <article class="ct-card">
@@ -231,11 +224,7 @@ negocio.nombre.charAt(0).toUpperCase() : '?'; const categoriaNames = Object.keys
                 <div class="ct-card__footer">
                   <span class="ct-card__price">$<%= prod.precio.toFixed(2) %></span>
                   <% if (!agotado) { %>
-                  <!-- Si no esta en carrito: boton +. Si ya esta: control de cantidad -->
                   <template x-if="getQuantity('<%= prod._id %>') === 0">
-                    <%# Datos del producto via data-* (JSON.stringify + escape EJS) en vez de
-                    interpolar en un string JS — evita XSS si el nombre del producto trae
-                    comillas/scripts. %>
                     <button
                       class="ct-card__add-btn"
                       data-producto="<%= JSON.stringify({ id: String(prod._id), nombre: prod.nombre, precio: prod.precio, stock: stockNum }) %>"
@@ -287,7 +276,6 @@ negocio.nombre.charAt(0).toUpperCase() : '?'; const categoriaNames = Object.keys
       </div>
     </main>
 
-    <!-- CART DRAWER -->
     <div
       x-show="open"
       x-cloak
@@ -363,7 +351,6 @@ negocio.nombre.charAt(0).toUpperCase() : '?'; const categoriaNames = Object.keys
       </div>
     </aside>
 
-    <!-- TOAST -->
     <div
       x-show="toastMessage"
       x-cloak
@@ -372,7 +359,6 @@ negocio.nombre.charAt(0).toUpperCase() : '?'; const categoriaNames = Object.keys
       x-text="toastMessage"
     ></div>
 
-    <!-- FOOTER -->
     <footer class="ct-footer">
       <div class="ct-footer__inner">
         <% if (negocio.direccion) { %>

@@ -1,4 +1,3 @@
-# nginx-ingress controller (en su propio namespace) puede hablar con el API
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

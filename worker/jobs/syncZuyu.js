@@ -1,23 +1,3 @@
-/**
- * Job: sync-zuyu
- * Procesa eventos de inventario que vienen de ZUYU via webhook.
- *
- * Tipos de evento (contrato ZUYU/backend/publicApi):
- *   - producto_creado:      upsert del producto en Mongo local
- *   - producto_actualizado: refrescar campos del producto
- *   - producto_eliminado:   marcar inactivo
- *   - stock_actualizado:    actualizar solo stock (mas frecuente)
- *   - pedido_confirmado:    confirmacion de que ZUYU registro el pedido
- *   - pedido_cancelado:     ZUYU cancelo el pedido — marcar local cancelado
- *
- * IDEMPOTENCIA: BullMQ ya deduplica por jobId=eventId, pero agregamos una
- * segunda capa con un SET NX en Redis (TTL 10 min). Asi, aunque el job se
- * reintente o llegue duplicado por otra via, el efecto se aplica una vez.
- *
- * El payload de producto viene mapeado por el ACL de ZUYU:
- *   { id, nombre, descripcion, precio, stock, categoria, imagen, trackeado }
- * donde `id` es el ID_PRODUCTO de ZUYU.
- */
 const mongoose = require('mongoose');
 
 const negocioSchema = new mongoose.Schema({}, { strict: false, collection: 'negocios' });
@@ -33,13 +13,13 @@ const redis = new IORedis({
   maxRetriesPerRequest: null,
 });
 
-const IDEM_TTL_SECONDS = 10 * 60; // 10 min
+const IDEM_TTL_SECONDS = 10 * 60;
 
+// Procesa eventos de inventario y pedidos que llegan de ZUYU via webhook.
 module.exports = async (job, logger) => {
   const { event, negocioSlug, payload, eventId } = job.data;
   logger.info({ event, negocioSlug, eventId }, 'Procesando sync ZUYU');
 
-  // ── Idempotencia: SET NX. Si ya existe, el evento ya se proceso. ──
   if (eventId) {
     const fresh = await redis.set(`zuyu:evt:${eventId}`, '1', 'EX', IDEM_TTL_SECONDS, 'NX');
     if (fresh === null) {
@@ -54,9 +34,6 @@ module.exports = async (job, logger) => {
     return { ok: false, reason: 'negocio_no_encontrado' };
   }
 
-  // El id del producto en el payload es el ID_PRODUCTO de ZUYU.
-  // En el micrositio lo guardamos como campo `zuyuProductoId` para
-  // correlacionar (el _id local es independiente).
   const zuyuId = payload?.id;
 
   switch (event) {
@@ -114,9 +91,6 @@ module.exports = async (job, logger) => {
       break;
 
     case 'pedido_confirmado': {
-      // ZUYU confirma el pedido como Venta. Enlazamos el Pedido local con
-      // el zuyuVentaId/idVenta para que el panel del dueno pueda mostrar
-      // el folio fiscal y para correlacionar reportes.
       const Pedido =
         mongoose.models.Pedido ||
         mongoose.model('Pedido', new mongoose.Schema({}, { strict: false, collection: 'pedidos' }));
@@ -142,17 +116,11 @@ module.exports = async (job, logger) => {
     }
 
     case 'pedido_cancelado': {
-      // ZUYU cancelo el pedido (desde la app de ZUYU, o es el eco de la
-      // cancelacion que origino el propio micrositio). Marcamos el Pedido
-      // local como cancelado para que el panel del dueno refleje el estado.
       const Pedido =
         mongoose.models.Pedido ||
         mongoose.model('Pedido', new mongoose.Schema({}, { strict: false, collection: 'pedidos' }));
       const refCancel = payload?.referenciaExterna;
       if (refCancel) {
-        // El filtro `estado: $ne cancelado` hace la operacion idempotente:
-        // si el micrositio ya lo cancelo localmente, no matchea -> no
-        // duplica el item de historial.
         await Pedido.updateOne(
           { referenciaExterna: refCancel, negocioId: negocio._id, estado: { $ne: 'cancelado' } },
           {
@@ -178,9 +146,6 @@ module.exports = async (job, logger) => {
       logger.warn({ event }, 'Evento desconocido de ZUYU');
   }
 
-  // Invalidar cache del catalogo del slug (el TTLCache in-memory del API
-  // se invalida via su propio mecanismo; aqui limpiamos la key Redis si
-  // existe alguna estrategia de cache compartida).
   await redis.del(`tienda:${negocioSlug}`).catch(() => {});
   logger.info({ negocioSlug, event }, 'Sync ZUYU completado, cache invalidado');
 

@@ -1,7 +1,3 @@
-# ═══════════════════════════════════════════════════════════════════
-# Permite DNS (kube-dns/coredns) a TODOS los pods del namespace
-# Sin esto nada puede resolver nombres internos
-# ═══════════════════════════════════════════════════════════════════
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

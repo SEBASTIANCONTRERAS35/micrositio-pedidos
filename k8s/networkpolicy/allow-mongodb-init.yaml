@@ -1,9 +1,3 @@
-# ═══════════════════════════════════════════════════════════════════
-# El Job mongodb-init necesita conectar a MongoDB para inicializar el
-# Replica Set y crear los usuarios. Sin esto, default-deny-all lo
-# bloquea y el Job queda colgado en "Esperando que mongodb-0...".
-# (DNS ya está cubierto por allow-egress-dns con podSelector: {}.)
-# ═══════════════════════════════════════════════════════════════════
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -23,7 +17,6 @@ spec:
         - protocol: TCP
           port: 27017
 ---
-# MongoDB acepta ingress del Job mongodb-init (init del RS + creación de usuarios)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

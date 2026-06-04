@@ -1,13 +1,3 @@
-/**
- * Prometheus metrics para el worker BullMQ.
- * Expone /metrics en :3001 — scrape por kube-prometheus-stack vía ServiceMonitor.
- *
- * Métricas custom:
- *  - worker_jobs_total{queue,status}       counter (status=completed|failed)
- *  - worker_job_duration_seconds{queue}    histogram (procesamiento)
- *  - worker_active_jobs{queue}             gauge (jobs en flight)
- *  - + default Node.js metrics
- */
 'use strict';
 
 const http = require('http');
@@ -40,8 +30,6 @@ const activeJobs = new promClient.Gauge({
   registers: [register],
 });
 
-// Profundidad de cola: jobs esperando ser procesados. Lo consume la alerta
-// QueueBacklogHigh y refleja lo mismo que ve KEDA para escalar.
 const queuePending = new promClient.Gauge({
   name: 'worker_queue_pending',
   help: 'Jobs pendientes (waiting + delayed) por cola BullMQ',
@@ -49,7 +37,7 @@ const queuePending = new promClient.Gauge({
   registers: [register],
 });
 
-/** Conecta los eventos de BullMQ Worker a las métricas. */
+// Conecta los eventos de BullMQ Worker a las métricas.
 function instrumentWorker(worker) {
   const nombreCola = worker.name;
   worker.on('active', () => activeJobs.labels(nombreCola).inc());
@@ -66,7 +54,7 @@ function instrumentWorker(worker) {
   });
 }
 
-/** Arranca servidor HTTP en :3001 con endpoint /metrics. */
+// Arranca servidor HTTP en :3001 con endpoint /metrics.
 function startMetricsServer(port = 3001) {
   const servidor = http.createServer(async (req, respuesta) => {
     if (req.url === '/metrics') {
@@ -85,35 +73,23 @@ function startMetricsServer(port = 3001) {
   return servidor;
 }
 
-/**
- * Muestrea la profundidad de cada cola BullMQ y actualiza worker_queue_pending.
- * Exportado para poder testear el sampling sin levantar el colector completo.
- *
- * @param {import('bullmq').Queue[]} queues
- */
+// Muestrea la profundidad de cada cola BullMQ y actualiza worker_queue_pending.
 async function sampleQueueDepth(colas) {
   for (const q of colas) {
     try {
       const conteos = await q.getJobCounts('wait', 'delayed');
       queuePending.labels(q.name).set((conteos.wait || 0) + (conteos.delayed || 0));
     } catch {
-      // Redis temporalmente inaccesible — las métricas nunca deben tumbar
-      // el worker. La siguiente muestra reintenta.
     }
   }
 }
 
-/**
- * Arranca un colector periódico de profundidad de colas. Crea un Queue
- * read-only por nombre y actualiza el gauge cada `intervalMs`.
- *
- * @returns {{ stop: () => Promise<void> }}
- */
+// Arranca un colector periódico de profundidad de colas.
 function startQueueDepthCollector(queueNames, conexion, intervalMs = 15000) {
   const colas = queueNames.map((nombre) => new Queue(nombre, { connection: conexion }));
   const temporizador = setInterval(() => sampleQueueDepth(colas), intervalMs);
-  temporizador.unref(); // las métricas no deben impedir que el proceso termine
-  sampleQueueDepth(colas); // primera muestra inmediata
+  temporizador.unref();
+  sampleQueueDepth(colas);
   return {
     async stop() {
       clearInterval(temporizador);

@@ -1,14 +1,3 @@
-/**
- * Test critico: 10 pedidos concurrentes del ultimo producto.
- * Solo 1 debe tener exito — valida la invariante de stock atomico que
- * F2-deep movio a productoRepository.descontarStock (filtro $gte condicional).
- *
- * Usa MongoMemoryReplSet (mongodb-memory-server): Replica Set real en memoria,
- * necesario para transacciones multi-doc.
- *
- * describe/it/expect/beforeAll/afterAll globales (vitest.integration.config.js
- * → globals: true). NO usar require('vitest') — Vitest 2.x lo rechaza.
- */
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
 
@@ -18,19 +7,21 @@ const productoRepo = require('../../infra/repositories/productoRepository');
 
 let replset;
 
+// Levanta un replica set en memoria y conecta mongoose antes de las pruebas.
 beforeAll(async () => {
   replset = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
   await mongoose.connect(replset.getUri());
 }, 60000);
 
+// Desconecta mongoose y detiene el replica set al terminar las pruebas.
 afterAll(async () => {
   await mongoose.disconnect();
   await replset?.stop();
 });
 
 describe('Atomicidad de stock bajo concurrencia', () => {
+  // Verifica que 10 pedidos concurrentes del ultimo producto solo den 1 exito.
   it('10 pedidos concurrentes del ultimo producto: solo 1 success', async () => {
-    // Setup: negocio + producto con stock=1
     const negocio = await Negocio.create({ slug: 'test-shop', nombre: 'Test Shop' });
     const producto = await Producto.create({
       negocioId: negocio._id,
@@ -39,8 +30,7 @@ describe('Atomicidad de stock bajo concurrencia', () => {
       stock: 1,
     });
 
-    // 10 transacciones concurrentes — cada una usa el repo REAL (no se
-    // reimplementa la logica): asi el test cubre productoRepository.descontarStock.
+    // Ejecuta una transaccion que descuenta stock usando el repositorio real.
     const intentos = Array.from({ length: 10 }).map(async () => {
       const session = await mongoose.startSession();
       try {
@@ -62,8 +52,8 @@ describe('Atomicidad de stock bajo concurrencia', () => {
     const results = await Promise.all(intentos);
     const exitos = results.filter((r) => r === true).length;
 
-    expect(exitos).toBe(1); // SOLO 1 transaccion exitosa
+    expect(exitos).toBe(1);
     const productoFinal = await Producto.findById(producto._id);
-    expect(productoFinal.stock).toBe(0); // Stock final correcto
+    expect(productoFinal.stock).toBe(0);
   }, 30000);
 });

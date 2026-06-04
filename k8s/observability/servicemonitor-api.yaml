@@ -1,11 +1,3 @@
-# ServiceMonitor del API — hace que Prometheus scrapee las métricas del API.
-#
-# Sin esto, el API queda instrumentado (expone /metrics en el puerto http/3000)
-# pero NUNCA scrapeado → los paneles de Grafana de latencia P95 y error-rate 5xx
-# del API quedan vacíos. Es el gemelo del servicemonitor-worker.yaml.
-#
-# El label `release: kps` es OBLIGATORIO: el Prometheus del kube-prometheus-stack
-# tiene serviceMonitorSelector = release=kps, así que sin ese label no lo recoge.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:

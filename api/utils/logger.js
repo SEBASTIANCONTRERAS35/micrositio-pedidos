@@ -1,10 +1,3 @@
-/**
- * Logger Pino con redaccion automatica de PII
- * - Salida JSON estructurada (compatible con Loki + Grafana Alloy)
- * - PII (telefono, email, direccion, password, token) NUNCA aparece en logs
- * - En desarrollo: pretty-print con colores
- * - En produccion: JSON puro hacia stdout
- */
 const pino = require('pino');
 
 const isDev = process.env.NODE_ENV !== 'production';
@@ -13,6 +6,7 @@ const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
   timestamp: pino.stdTimeFunctions.isoTime,
   formatters: {
+    // Devuelve el nivel de log como etiqueta de texto.
     level: (label) => ({ level: label }),
   },
   redact: {

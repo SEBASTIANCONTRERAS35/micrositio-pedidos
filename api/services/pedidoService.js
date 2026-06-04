@@ -1,23 +1,10 @@
-/**
- * Servicio de pedidos — ORQUESTACION de la logica critica del sistema.
- *
- * Tras el refactor (F2-deep) este modulo solo ORQUESTA: la logica pura vive
- * en domain/ (estadoPedido, pedidoCalculos) y el acceso a datos en
- * infra/repositories/. Aqui solo queda el "pegamento": decidir mock vs ZUYU,
- * coordinar la transaccion atomica y encolar jobs.
- *
- * crearPedidoConStock:
- *   - Modo MOCK: transaccion MongoDB para crear pedido + descontar stock
- *     atomicamente (requiere Replica Set).
- *   - Modo conectado a ZUYU: delega el stock a ZUYU (fuente de verdad) y
- *     guarda copia local para tracking + delivery + panel.
- */
 'use strict';
 
 const mongoose = require('mongoose');
 const { Queue } = require('bullmq');
 const redis = require('./redis');
 const zuyu = require('./zuyu');
+const delivery = require('./delivery');
 const Negocio = require('../models/negocio');
 const { tiendaCache } = require('./cache');
 const { StockInsuficienteError, NotFoundError } = require('../utils/errors');
@@ -34,18 +21,14 @@ const productoRepo = require('../infra/repositories/productoRepository');
 
 const { ESTADOS } = estadoPedido;
 
-// ── Colas BullMQ ───────────────────────────────────────────────────
 const redisConn = {
   host: process.env.REDIS_HOST,
   port: parseInt(process.env.REDIS_PORT || '6379', 10),
   password: process.env.REDIS_PASSWORD,
 };
-// removeOnComplete/removeOnFail evitan que los jobs terminados se acumulen
-// indefinidamente en Redis. Sin esto, las claves 'bull:notificaciones:*' crecían
-// sin límite (se detectaron ~21k jobs completados sin limpiar).
 const defaultJobOptions = {
-  removeOnComplete: 1000, // conserva solo los últimos 1000 completados
-  removeOnFail: 5000, // conserva más fallidos para depurar
+  removeOnComplete: 1000,
+  removeOnFail: 5000,
 };
 const colaDelivery = new Queue('delivery', { connection: redisConn, defaultJobOptions });
 const colaNotificaciones = new Queue('notificaciones', {
@@ -53,7 +36,7 @@ const colaNotificaciones = new Queue('notificaciones', {
   defaultJobOptions,
 });
 
-/** Encola la notificacion de "pedido creado" al cliente. */
+// Encola la notificacion de "pedido creado" al cliente.
 function notificarCreado(pedidoId) {
   return colaNotificaciones.add('confirmacion-cliente', {
     pedidoId,
@@ -61,25 +44,17 @@ function notificarCreado(pedidoId) {
   });
 }
 
-/**
- * Genera un pedidoId humano-legible: PED-YYMM-NNNN
- */
+// Genera un pedidoId humano-legible: PED-YYMM-NNNN
 async function generarPedidoId() {
   const now = new Date();
   const ym = `${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}`;
   const counterKey = `counter:pedido:${ym}`;
   const secuencia = await redis.incr(counterKey);
-  await redis.expire(counterKey, 60 * 60 * 24 * 60); // 60 dias
+  await redis.expire(counterKey, 60 * 60 * 24 * 60);
   return `PED-${ym}-${String(secuencia).padStart(4, '0')}`;
 }
 
-/**
- * Crea un pedido con stock atomico. Decide POR NEGOCIO si delega a ZUYU o
- * lo resuelve localmente (segun zuyuConfig — ver zuyu.js).
- *
- * @param {object} input - { negocioSlug, cliente, productos, metodoPago, notas, idempotencyKey }
- * @returns {object} pedido creado
- */
+// Crea un pedido con stock atomico; decide por negocio si delega a ZUYU o local.
 async function crearPedidoConStock(input) {
   const negocio = await Negocio.findOne({
     slug: input.negocioSlug,
@@ -95,16 +70,11 @@ async function crearPedidoConStock(input) {
   return crearPedidoLocal(negocio, input);
 }
 
-/**
- * Modo MOCK: el micrositio es la fuente de verdad del stock. Descuenta
- * stock y crea el pedido en una transaccion atomica.
- */
+// Modo MOCK: descuenta stock y crea el pedido en una transaccion atomica.
 async function crearPedidoLocal(negocio, input) {
-  // 1. Cargar productos para el snapshot
   const idsProductos = input.productos.map((p) => p.id);
   const productosDb = await productoRepo.buscarActivosPorIds(idsProductos, negocio._id);
 
-  // 2. Dominio puro: construir snapshot + detectar problemas
   const { snapshot, faltantes, noEncontrados } = construirSnapshot(input.productos, productosDb);
   if (noEncontrados.length > 0) {
     throw new NotFoundError('Algunos productos no existen');
@@ -116,7 +86,6 @@ async function crearPedidoLocal(negocio, input) {
   const { subtotal, costoEnvio, total } = calcularTotales(snapshot);
   const pedidoId = await generarPedidoId();
 
-  // 3. TRANSACCION: descontar stock (atomico/condicional) + crear pedido
   const session = await mongoose.startSession();
   try {
     let pedidoCreado;
@@ -151,16 +120,10 @@ async function crearPedidoLocal(negocio, input) {
   }
 }
 
-/**
- * Modo conectado: ZUYU verifica/decrementa stock atomicamente del lado de su
- * Replica Set. El micrositio guarda una copia local para tracking + panel.
- */
+// Modo conectado: ZUYU maneja el stock y se guarda una copia local para tracking.
 async function crearPedidoViaZuyu(negocio, input) {
   const pedidoId = await generarPedidoId();
 
-  // referenciaExterna ESTABLE: si el cliente mando Idempotency-Key, esa es la
-  // referencia que ve ZUYU. Un reintento llega con la MISMA ref y la
-  // idempotencia de ZUYU devuelve la Venta existente (no crea una segunda).
   const referenciaExterna = input.idempotencyKey || pedidoId;
 
   const zuyuResp = await zuyu.crearPedido(input.negocioSlug, {
@@ -176,7 +139,7 @@ async function crearPedidoViaZuyu(negocio, input) {
     referenciaExterna,
     negocioId: negocio._id,
     cliente: input.cliente,
-    productos: zuyuResp.productos, // snapshot autoritativo de ZUYU
+    productos: zuyuResp.productos,
     subtotal: zuyuResp.subtotal,
     costoEnvio: zuyuResp.costoEnvio || COSTO_ENVIO_BASE,
     total: zuyuResp.total,
@@ -191,7 +154,6 @@ async function crearPedidoViaZuyu(negocio, input) {
     ],
   });
 
-  // El stock cambio en ZUYU — invalidar el cache del catalogo.
   tiendaCache.delete(input.negocioSlug);
   await notificarCreado(pedido.pedidoId);
 
@@ -199,10 +161,7 @@ async function crearPedidoViaZuyu(negocio, input) {
   return pedido.toObject();
 }
 
-/**
- * Confirma un pedido (dueno) — encola la solicitud de repartidor.
- * negocioId del JWT: el pedido DEBE pertenecer a su negocio (tenant isolation).
- */
+// Confirma un pedido (dueno) y encola la solicitud de repartidor.
 async function confirmarPedido(pedidoId, usuarioId, negocioId) {
   const pedido = await pedidoRepo.buscarPorId(pedidoId, negocioId, {
     populateNegocio: true,
@@ -223,21 +182,14 @@ async function confirmarPedido(pedidoId, usuarioId, negocioId) {
 
   await colaDelivery.add('solicitar-repartidor', {
     pedidoId: pedido.pedidoId,
-    proveedor: pedido.negocioId.deliveryProvider,
+    proveedor: delivery.selectProviderByCity(pedido.negocioId),
   });
 
   logger.info({ pedidoId }, 'Pedido confirmado');
   return pedido;
 }
 
-/**
- * Cancela un pedido (dueno) y devuelve el stock en una transaccion atomica.
- * negocioId del JWT: tenant isolation (evita IDOR entre negocios).
- */
-// Pedido viene de ZUYU si tiene zuyuVentaId (set por syncZuyu en
-// pedido_confirmado) O si algun product.id no es un ObjectId valido
-// (SKU de ZUYU como "AVI-250"). En cualquiera de los dos casos, el stock
-// vive en ZUYU — no debemos devolver stock en el Mongo local.
+// Determina si el pedido pertenece a ZUYU (zuyuVentaId o id no-ObjectId).
 function esPedidoZuyu(pedido) {
   if (pedido.zuyuVentaId) {
     return true;
@@ -245,12 +197,7 @@ function esPedidoZuyu(pedido) {
   return (pedido.productos || []).some((p) => !mongoose.Types.ObjectId.isValid(p.id));
 }
 
-/**
- * Si el pedido ya tenia un repartidor solicitado, encola la cancelacion del
- * delivery en el carrier. Fire-and-forget: no bloquea la cancelacion del
- * pedido y el worker reintenta si el carrier falla. Se llama SIEMPRE fuera de
- * la transaccion Mongo (es I/O a Redis).
- */
+// Encola la cancelacion del repartidor si el pedido ya tenia uno solicitado.
 async function cancelarRepartidorSiAplica(pedido) {
   const deliveryId = pedido && pedido.delivery && pedido.delivery.deliveryId;
   if (!deliveryId) {
@@ -262,9 +209,8 @@ async function cancelarRepartidorSiAplica(pedido) {
   });
 }
 
+// Cancela un pedido (dueno) y devuelve el stock (ZUYU o transaccion local).
 async function cancelarPedido(pedidoId, usuarioId, negocioId) {
-  // Lectura + validacion previa (fuera de transaccion). populateNegocio
-  // para tener el slug que necesita el cliente de ZUYU.
   const pedidoZuyu = await pedidoRepo.buscarPorId(pedidoId, negocioId, {
     populateNegocio: true,
   });
@@ -275,11 +221,6 @@ async function cancelarPedido(pedidoId, usuarioId, negocioId) {
     throw new Error(`No se puede cancelar pedido ${pedidoZuyu.estado}`);
   }
 
-  // ── Pedido de ZUYU: ZUYU es source-of-truth del stock ──────────────
-  // La cancelacion en ZUYU es una llamada HTTP — va FUERA de toda
-  // transaccion Mongo (nunca mantener una transaccion abierta durante I/O
-  // de red). ZUYU revierte el stock y es idempotente; solo si responde OK
-  // marcamos el pedido local como cancelado.
   if (esPedidoZuyu(pedidoZuyu)) {
     const slug = pedidoZuyu.negocioId?.slug;
     const resultado = await zuyu.cancelarPedido(
@@ -288,8 +229,6 @@ async function cancelarPedido(pedidoId, usuarioId, negocioId) {
       `Cancelado por usuario ${usuarioId}`
     );
     if (!resultado) {
-      // El negocio se desconecto de ZUYU despues de crear el pedido —
-      // no podemos revertir el stock remoto. Marcamos local y avisamos.
       logger.warn({ pedidoId }, 'Negocio sin conexion ZUYU — cancelacion solo local');
     }
     pedidoZuyu.estado = ESTADOS.CANCELADO;
@@ -305,7 +244,6 @@ async function cancelarPedido(pedidoId, usuarioId, negocioId) {
     return pedidoZuyu;
   }
 
-  // ── Pedido local (mock): transaccion atomica devolver stock + marcar ──
   const session = await mongoose.startSession();
   try {
     let pedidoCancelado;

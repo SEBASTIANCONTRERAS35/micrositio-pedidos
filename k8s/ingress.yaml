@@ -1,6 +1,3 @@
-# ═══════════════════════════════════════════════════════════════════
-# Certificado para zuyu.local firmado por nuestro CA propio
-# ═══════════════════════════════════════════════════════════════════
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -14,12 +11,9 @@ spec:
   commonName: zuyu.local
   dnsNames:
     - zuyu.local
-  duration: 8760h # 1 ano
+  duration: 8760h
   renewBefore: 720h
 ---
-# ═══════════════════════════════════════════════════════════════════
-# Ingress nginx con TLS terminado en el ingress
-# ═══════════════════════════════════════════════════════════════════
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -28,8 +22,6 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: 'true'
     nginx.ingress.kubernetes.io/force-ssl-redirect: 'true'
-    # nginx envía al ClusterIP del Service (no a los endpoints directos), para
-    # que respete internalTrafficPolicy: Local y el tráfico no cruce de nodo.
     nginx.ingress.kubernetes.io/service-upstream: 'true'
     nginx.ingress.kubernetes.io/proxy-body-size: '1m'
     nginx.ingress.kubernetes.io/proxy-read-timeout: '30'

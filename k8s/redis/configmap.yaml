@@ -1,10 +1,3 @@
-# ═══════════════════════════════════════════════════════════════════
-# ConfigMap con redis.conf:
-# - AUTH habilitada
-# - Comandos peligrosos deshabilitados
-# - AOF persistence
-# - Memory limits
-# ═══════════════════════════════════════════════════════════════════
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -12,7 +5,6 @@ metadata:
   namespace: micrositio
 data:
   redis.conf: |
-    # Bind y network
     bind 0.0.0.0
     protected-mode yes
     port 6379
@@ -20,32 +12,22 @@ data:
     timeout 0
     tcp-keepalive 300
 
-    # Auth (la password real viene del Secret via env REDIS_PASSWORD)
-    # requirepass se setea via command line en el Deployment
-
-    # Disable dangerous commands
     rename-command FLUSHDB ""
     rename-command FLUSHALL ""
     rename-command CONFIG ""
     rename-command DEBUG ""
     rename-command SHUTDOWN "SHUTDOWN_b1c8d4f2"
 
-    # Persistence
     appendonly yes
     appendfsync everysec
     save 900 1
     save 300 10
     save 60 10000
 
-    # Memory limits
     maxmemory 200mb
-    # noeviction: si Redis se llena, RECHAZA escrituras en vez de BORRAR claves.
-    # Crítico para un backend de cola: allkeys-lru podría descartar jobs encolados.
     maxmemory-policy noeviction
 
-    # Logging
     loglevel notice
 
-    # Slow log
     slowlog-log-slower-than 10000
     slowlog-max-len 128

@@ -1,26 +1,10 @@
-/**
- * Tests de `verifyZuyuSignature` (api/utils/hmac.js) — el verificador de los
- * webhooks ENTRANTES de ZUYU.
- *
- * Incluye un TEST DE CONTRATO: `firmarEstiloZuyu` replica exactamente como
- * ZUYU firma (ver ZUYU/backend/publicApi/shared/auth/hmacSigner.js — firma
- * `${t}.${rawBody}`, header `t=<unix>,v1=<hmac>[,v0=<previo>]`). Si ZUYU
- * cambia su esquema de firma, este test deberia romper.
- *
- * describe/it/expect globales (vitest.config.js -> globals: true).
- * Los secrets se generan en runtime — no son valores hardcodeados (evita
- * falsos positivos de escaneo de secretos).
- */
 const crypto = require('crypto');
 const { verifyZuyuSignature } = require('../../utils/hmac');
 
 const SECRET = crypto.randomBytes(24).toString('hex');
 const SECRET_PREVIO = crypto.randomBytes(24).toString('hex');
 
-/**
- * Replica el esquema de firma de ZUYU (hmacSigner.sign).
- * @returns {string} valor del header X-Zuyu-Signature
- */
+// Replica el esquema de firma de ZUYU (hmacSigner.sign).
 function firmarEstiloZuyu(rawBody, secret, secretPrevio = null, timestampMs = Date.now()) {
   const t = Math.floor(timestampMs / 1000);
   const signedPayload = `${t}.${rawBody}`;
@@ -61,9 +45,7 @@ describe('verifyZuyuSignature — rotacion dual-secret', () => {
 
   it('acepta firma v0 (secret previo) durante la transicion', () => {
     const body = '{"a":1}';
-    // ZUYU firma con nuevo + previo (dual): v1=nuevo, v0=previo
     const header = firmarEstiloZuyu(body, SECRET, SECRET_PREVIO);
-    // el receptor solo tiene el previo todavia — debe aceptar via v0
     expect(verifyZuyuSignature(body, header, [SECRET_PREVIO])).toBe(true);
   });
 });

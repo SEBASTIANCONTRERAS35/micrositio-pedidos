@@ -1,16 +1,6 @@
-/**
- * Seguridad del modelo Negocio — la integracion con ZUYU guarda material
- * secreto (apiKey, webhookSecret). Estos tests verifican que esos secretos
- * NUNCA salgan en una serializacion JSON, aunque esten presentes en la
- * instancia (p.ej. tras un .select('+zuyuConfig.apiKey')).
- *
- * Son tests puros: no requieren conexion a Mongo (instanciar y serializar
- * un modelo Mongoose funciona offline).
- *
- * describe/it/expect son globales (vitest.config.js → globals: true).
- */
 const Negocio = require('../../models/negocio');
 
+// Crea una instancia de Negocio con secretos de zuyuConfig poblados.
 function negocioConSecretos() {
   return new Negocio({
     slug: 'demo',
@@ -29,7 +19,6 @@ function negocioConSecretos() {
 describe('Negocio.zuyuConfig — el material secreto vive en la instancia', () => {
   it('apiKey y webhookSecret SI estan en la instancia (los necesita zuyu.js)', () => {
     const n = negocioConSecretos();
-    // select:false solo afecta QUERIES — la asignacion directa si los pone.
     expect(n.zuyuConfig.apiKey).toBe('zk_dev_SUPERSECRETO_EN_CLARO');
     expect(n.zuyuConfig.webhookSecret).toBe('whsec_SECRETO_EN_CLARO');
   });
@@ -54,7 +43,6 @@ describe('Negocio.toJSON — los secretos NUNCA se serializan', () => {
     const dump = JSON.stringify(negocioConSecretos());
     expect(dump).not.toContain('SUPERSECRETO');
     expect(dump).not.toContain('whsec_');
-    // el prefijo si puede aparecer — no es secreto
     expect(dump).toContain('zk_dev_abc12');
   });
 

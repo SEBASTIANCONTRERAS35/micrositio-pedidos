@@ -25,10 +25,6 @@ spec:
   workspaces:
     - name: source
       description: workspace con el repo clonado en source/repo
-  # Secret con credenciales de Docker Hub en formato dockerconfigjson.
-  # optional:true → la task sigue corriendo aunque el Secret no exista
-  # (builds local-only no requieren credenciales del Hub). Se renombra la
-  # clave .dockerconfigjson → config.json, que es donde Kaniko busca el login.
   volumes:
     - name: docker-config
       secret:
@@ -40,11 +36,6 @@ spec:
   steps:
     - name: build-and-push
       image: gcr.io/kaniko-project/executor:v1.23.2
-      # Las flags insecure son POR-REGISTRY (no globales): solo el registry
-      # local (NodePort 30500) habla HTTP plano. Docker Hub usa HTTPS normal,
-      # así que NO debe marcarse insecure o el push al Hub fallaría.
-      # El context es la raíz del repo (monorepo npm workspaces: el Dockerfile
-      # necesita el package-lock.json raíz).
       args:
         - --dockerfile=$(workspaces.source.path)/repo/$(params.dockerfile)
         - --context=$(workspaces.source.path)/repo

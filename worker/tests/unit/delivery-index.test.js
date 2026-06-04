@@ -1,9 +1,3 @@
-/**
- * Tests de worker/services/delivery/index.js — la capa de abstracción
- * multi-carrier. Verifica que enruta al provider correcto y que falla
- * de forma explícita ante un provider desconocido (en vez de un crash
- * silencioso o un undefined más adelante).
- */
 process.env.IVOY_MOCK = 'true';
 
 const delivery = require('../../services/delivery');

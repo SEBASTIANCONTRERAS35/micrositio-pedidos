@@ -28,7 +28,7 @@ const negocio = db.negocios.insertOne({
   telefono: "+525555555555",
   direccion: {calle: "Av. Reforma 123", colonia: "Centro", ciudad: "CDMX", estado: "CDMX", cp: "06000"},
   horarios: {apertura: "08:00", cierre: "22:00"},
-  deliveryProvider: "ivoy",
+  deliveryProvider: "auto",
   activo: true,
   creadoEn: new Date(),
   actualizadoEn: new Date()

@@ -1,9 +1,4 @@
-/**
- * Lógica del catálogo público (tienda/index.ejs).
- * Externalizado del EJS para poder quitar 'unsafe-inline' del CSP de scripts.
- *
- * cartStore(slug): store de Alpine para el carrito (persistido en localStorage).
- */
+// Crea el store de Alpine del carrito persistido en localStorage por slug.
 function cartStore(slug) {
   const STORAGE_KEY = 'cart_' + slug;
   let toastTimer = null;
@@ -11,15 +6,19 @@ function cartStore(slug) {
     open: false,
     items: JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'),
     toastMessage: '',
+    // Devuelve la suma de cantidades de todos los items del carrito.
     get totalItems() {
       return this.items.reduce((s, i) => s + i.cantidad, 0);
     },
+    // Devuelve el importe total (precio por cantidad) del carrito.
     get total() {
       return this.items.reduce((s, i) => s + i.precio * i.cantidad, 0);
     },
+    // Persiste los items del carrito en localStorage.
     save() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.items));
     },
+    // Muestra un toast temporal de producto agregado.
     showToast(nombre) {
       this.toastMessage = '✓ ' + nombre + ' agregado';
       clearTimeout(toastTimer);
@@ -27,8 +26,7 @@ function cartStore(slug) {
         this.toastMessage = '';
       }, 2000);
     },
-    // Recibe el <button>: lee el producto del data-attribute (JSON seguro,
-    // escapado por EJS) en vez de interpolar datos en un string JS — anti-XSS.
+    // Lee el producto del data-attribute del boton y lo agrega al carrito.
     addProduct(el) {
       let prod;
       try {
@@ -39,6 +37,7 @@ function cartStore(slug) {
       this.addToCart(prod);
       this.showToast(prod.nombre);
     },
+    // Agrega un producto al carrito respetando el stock disponible.
     addToCart(prod) {
       const existente = this.items.find((i) => i.id === prod.id);
       if (existente) {
@@ -50,6 +49,7 @@ function cartStore(slug) {
       }
       this.save();
     },
+    // Incrementa la cantidad de un item sin exceder su stock.
     increment(id) {
       const item = this.items.find((i) => i.id === id);
       if (item && item.cantidad < item.stock) {
@@ -57,6 +57,7 @@ function cartStore(slug) {
       }
       this.save();
     },
+    // Decrementa la cantidad de un item y lo elimina si llega a cero.
     decrement(id) {
       const item = this.items.find((i) => i.id === id);
       if (item) {
@@ -67,6 +68,7 @@ function cartStore(slug) {
       }
       this.save();
     },
+    // Devuelve la cantidad actual de un item en el carrito.
     getQuantity(id) {
       const item = this.items.find((i) => i.id === id);
       return item ? item.cantidad : 0;
@@ -74,10 +76,11 @@ function cartStore(slug) {
   };
 }
 
-// Smooth scroll a categorias
 document
   .querySelectorAll('.ct-cat-pill[href^="#cat-"], .ct-cat-pill--all')
+  // Registra el manejador de clic en cada pildora de categoria.
   .forEach(function (pill) {
+    // Hace scroll suave hacia la categoria destino al hacer clic.
     pill.addEventListener('click', function (e) {
       const target = document.querySelector(this.getAttribute('href'));
       if (target) {

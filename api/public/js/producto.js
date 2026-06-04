@@ -1,14 +1,9 @@
-/**
- * Lógica de la vista de detalle de producto (tienda/producto.ejs).
- * Agrega el producto al carrito (localStorage 'cart_<slug>', mismo formato
- * que tienda.js) respetando la cantidad elegida, y vuelve al catálogo.
- */
+// Logica de la vista de detalle de producto: agrega al carrito y vuelve al catalogo.
 function productoView(slug) {
   const STORAGE_KEY = 'cart_' + slug;
   return {
     cantidad: 1,
-    // Recibe el <button>: lee el producto del data-attribute (JSON escapado
-    // por EJS) en vez de interpolar datos en un string JS — anti-XSS.
+    // Lee el producto del data-attribute y lo agrega al carrito en localStorage.
     agregar(el) {
       let prod;
       try {

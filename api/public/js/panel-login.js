@@ -1,13 +1,11 @@
-/**
- * Login del panel del dueno (panel/login.ejs).
- * Externalizado del EJS para poder quitar 'unsafe-inline' del CSP de scripts.
- */
+// Login del panel del dueno (componente Alpine para panel/login.ejs).
 function loginForm() {
   return {
     email: '',
     password: '',
     submitting: false,
     error: '',
+    // Envia credenciales al API, guarda el token y redirige al panel.
     async submit() {
       this.submitting = true;
       this.error = '';

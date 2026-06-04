@@ -1,7 +1,4 @@
-/**
- * Panel del dueno — lista y gestion de pedidos (panel/pedidos.ejs).
- * Externalizado del EJS para poder quitar 'unsafe-inline' del CSP de scripts.
- */
+// Estado y logica Alpine del panel de pedidos del dueno.
 function panelPedidos() {
   return {
     pedidos: [],
@@ -16,12 +13,14 @@ function panelPedidos() {
       { value: 'en_camino', label: 'En camino' },
       { value: 'entregado', label: 'Entregados' },
     ],
+    // Devuelve los pedidos filtrados segun la pestana activa.
     get filtered() {
       if (this.filter === 'todos') {
         return this.pedidos;
       }
       return this.pedidos.filter((p) => p.estado === this.filter);
     },
+    // Calcula contadores y totales de pedidos del dia.
     get stats() {
       const today = new Date().toDateString();
       return {
@@ -35,12 +34,14 @@ function panelPedidos() {
           .reduce((s, p) => s + p.total, 0),
       };
     },
+    // Cuenta los pedidos que tienen el estado indicado.
     countByStatus(status) {
       if (status === 'todos') {
         return this.pedidos.length;
       }
       return this.pedidos.filter((p) => p.estado === status).length;
     },
+    // Traduce el codigo de estado a su etiqueta legible.
     estadoLabel(estado) {
       const map = {
         pendiente: 'Pendiente',
@@ -51,6 +52,21 @@ function panelPedidos() {
       };
       return map[estado] || estado;
     },
+    // Traduce el codigo del proveedor de envio a su nombre legible.
+    carrierLabel(proveedor) {
+      const map = {
+        ivoy: 'iVoy',
+        lalamove: 'Lalamove',
+        uberDirect: 'Uber Direct',
+        propio: 'Repartidor propio',
+      };
+      return map[proveedor] || proveedor;
+    },
+    // Devuelve la URL de tracking solo si usa http(s); evita XSS por javascript:.
+    trackUrlSeguro(url) {
+      return url && /^https?:\/\//i.test(url) ? url : '#';
+    },
+    // Formatea una fecha ISO a hora o fecha corta en espanol.
     formatTime(iso) {
       const d = new Date(iso);
       const today = new Date().toDateString();
@@ -64,6 +80,7 @@ function panelPedidos() {
         minute: '2-digit',
       });
     },
+    // Carga pedidos y datos del usuario/negocio desde la API del panel.
     async loadPedidos() {
       const token = localStorage.getItem('panel_token');
       if (!token) {
@@ -88,9 +105,11 @@ function panelPedidos() {
         console.error(e);
       }
     },
+    // Selecciona un pedido para mostrar su detalle.
     openDetalle(pedido) {
       this.selected = pedido;
     },
+    // Ejecuta una accion POST sobre un pedido y recarga la lista.
     async _accion(id, accion, mensaje) {
       const token = localStorage.getItem('panel_token');
       try {
@@ -110,22 +129,24 @@ function panelPedidos() {
         await this.loadPedidos();
         this.selected = null;
         if (mensaje) {
-          // pequeno feedback no bloqueante
           console.info(mensaje);
         }
       } catch (e) {
         alert('Error de red al ' + accion + ' el pedido: ' + e.message);
       }
     },
+    // Confirma un pedido por su id.
     async confirmar(id) {
       await this._accion(id, 'confirmar', 'Pedido confirmado');
     },
+    // Cancela un pedido tras confirmacion y devuelve el stock.
     async cancelar(id) {
       if (!confirm('Cancelar este pedido? El stock se devolvera.')) {
         return;
       }
       await this._accion(id, 'cancelar', 'Pedido cancelado');
     },
+    // Cierra la sesion y redirige al login del panel.
     logout() {
       localStorage.removeItem('panel_token');
       window.location.href = '/panel/login';

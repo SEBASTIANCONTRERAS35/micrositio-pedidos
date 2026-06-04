@@ -1,4 +1,3 @@
-# Permitir KEDA operator (ns: keda) conectar a redis para polling de longitud de cola
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

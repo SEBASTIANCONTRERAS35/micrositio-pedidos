@@ -1,8 +1,3 @@
-/**
- * Uber Direct provider — cobertura nacional MX (68 ciudades)
- * Por defecto en MOCK
- * Doc: https://developer.uber.com/docs/deliveries/overview
- */
 const { verifyHmacSignature } = require('../../../utils/hmac');
 const { construirOrigenEnvio } = require('../../../domain/envio');
 
@@ -12,6 +7,7 @@ const BASE_URL = process.env.UBER_BASE_URL || 'https://api.uber.com/v1';
 let tokenCacheado = null;
 let tokenExpiraEn = 0;
 
+// Obtiene y cachea el token OAuth de Uber, renovandolo al expirar.
 async function getAccessToken() {
   if (tokenCacheado && Date.now() < tokenExpiraEn) {
     return tokenCacheado;
@@ -37,6 +33,7 @@ async function getAccessToken() {
   return tokenCacheado;
 }
 
+// Solicita una entrega a Uber Direct para un pedido y negocio dados.
 async function requestDelivery(pedido, negocio) {
   if (IS_MOCK) {
     return {
@@ -60,7 +57,6 @@ async function requestDelivery(pedido, negocio) {
     body: JSON.stringify({
       pickup_address: origen.address,
       pickup_name: origen.name,
-      // Uber exige un telefono de pickup; fallback si el negocio no lo tiene.
       pickup_phone_number: origen.phone || '+525555555555',
       dropoff_address: pedido.cliente.direccion,
       dropoff_name: pedido.cliente.nombre,
@@ -68,7 +64,7 @@ async function requestDelivery(pedido, negocio) {
       manifest_items: pedido.productos.map((p) => ({
         name: p.nombre,
         quantity: p.cantidad,
-        price: Math.round(p.precioUnitario * 100), // centavos
+        price: Math.round(p.precioUnitario * 100),
       })),
       external_id: pedido.pedidoId,
     }),
@@ -87,6 +83,7 @@ async function requestDelivery(pedido, negocio) {
   };
 }
 
+// Consulta el estado actual de una entrega por su deliveryId.
 async function getStatus(deliveryId) {
   if (IS_MOCK) {
     return { estado: 'pickup' };
@@ -103,6 +100,7 @@ async function getStatus(deliveryId) {
   return { estado: mapEstado(datos.status) };
 }
 
+// Cancela una entrega de Uber Direct por su deliveryId.
 async function cancelDelivery(deliveryId) {
   if (IS_MOCK) {
     return { ok: true };
@@ -119,16 +117,17 @@ async function cancelDelivery(deliveryId) {
   return { ok: respuesta.ok };
 }
 
+// Verifica la firma HMAC del webhook entrante de Uber.
 function verifyWebhook(body, headers) {
   const secret = process.env.WEBHOOK_SECRET_UBER;
   if (!secret) {
     return true;
-  } // dev only
+  }
   const signature = headers['x-uber-signature'];
-  // Uber no envia timestamp explicito, depende del header X-Uber-Date
   return verifyHmacSignature(body, signature, secret);
 }
 
+// Normaliza el payload del webhook a la estructura interna de entrega.
 function parseWebhook(body) {
   return {
     deliveryId: body.delivery_id || body.id,
@@ -143,6 +142,7 @@ function parseWebhook(body) {
   };
 }
 
+// Mapea el estado de Uber al estado interno equivalente.
 function mapEstado(s) {
   const map = {
     pending: 'pending',

@@ -1,15 +1,3 @@
-/**
- * Tests de integracion de los repositorios refactorizados (F2-deep):
- *   - productoRepository: descontarStock (atomico/condicional), devolverStock,
- *     buscarActivosPorIds.
- *   - pedidoRepository: crear, crearEnSession, buscarPorId (tenant isolation).
- *
- * Usa MongoMemoryReplSet (mongodb-memory-server): un Replica Set real en
- * memoria — necesario para las transacciones multi-doc, sin la fragilidad
- * del port-mapping de testcontainers. Estos repos NO dependen de Redis.
- *
- * describe/it/expect/beforeAll/afterAll globales (vitest.integration.config.js).
- */
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
 
@@ -20,17 +8,20 @@ const pedidoRepo = require('../../infra/repositories/pedidoRepository');
 
 let replset;
 
+// Levanta un Replica Set en memoria y conecta mongoose antes de las pruebas
 beforeAll(async () => {
   replset = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
   await mongoose.connect(replset.getUri());
 }, 60000);
 
+// Desconecta mongoose y detiene el Replica Set al terminar
 afterAll(async () => {
   await mongoose.disconnect();
   await replset?.stop();
 });
 
 describe('productoRepository.descontarStock — atomicidad', () => {
+  // Verifica que descuenta y devuelve true cuando hay stock suficiente
   it('descuenta cuando hay stock suficiente y devuelve true', async () => {
     const negocio = await Negocio.create({ slug: 'shop-1', nombre: 'Shop 1' });
     const prod = await Producto.create({
@@ -53,6 +44,7 @@ describe('productoRepository.descontarStock — atomicidad', () => {
     expect((await Producto.findById(prod._id)).stock).toBe(7);
   });
 
+  // Verifica que NO descuenta y devuelve false cuando falta stock
   it('NO descuenta si falta stock y devuelve false (filtro $gte)', async () => {
     const negocio = await Negocio.create({ slug: 'shop-2', nombre: 'Shop 2' });
     const prod = await Producto.create({
@@ -72,9 +64,10 @@ describe('productoRepository.descontarStock — atomicidad', () => {
       session.endSession();
     }
     expect(ok).toBe(false);
-    expect((await Producto.findById(prod._id)).stock).toBe(2); // intacto
+    expect((await Producto.findById(prod._id)).stock).toBe(2);
   });
 
+  // Verifica que con 10 descuentos concurrentes del ultimo producto solo 1 gana
   it('10 descuentos concurrentes del ultimo producto: solo 1 gana', async () => {
     const negocio = await Negocio.create({ slug: 'shop-3', nombre: 'Shop 3' });
     const prod = await Producto.create({
@@ -109,6 +102,7 @@ describe('productoRepository.descontarStock — atomicidad', () => {
 });
 
 describe('productoRepository.devolverStock', () => {
+  // Verifica que devolverStock incrementa el stock de vuelta
   it('incrementa el stock de vuelta', async () => {
     const negocio = await Negocio.create({ slug: 'shop-4', nombre: 'Shop 4' });
     const prod = await Producto.create({
@@ -131,6 +125,7 @@ describe('productoRepository.devolverStock', () => {
 });
 
 describe('productoRepository.buscarActivosPorIds', () => {
+  // Verifica que solo trae productos activos del negocio indicado
   it('solo trae productos activos del negocio indicado', async () => {
     const negA = await Negocio.create({ slug: 'shop-a', nombre: 'A' });
     const negB = await Negocio.create({ slug: 'shop-b', nombre: 'B' });
@@ -148,13 +143,13 @@ describe('productoRepository.buscarActivosPorIds', () => {
       [p1._id.toString(), p2._id.toString(), p3._id.toString()],
       negA._id
     );
-    // p2 inactivo y p3 de otro negocio quedan fuera
     expect(encontrados).toHaveLength(1);
     expect(encontrados[0]._id.toString()).toBe(p1._id.toString());
   });
 });
 
 describe('pedidoRepository — CRUD + tenant isolation', () => {
+  // Verifica crear + buscarPorId acotado al negocio
   it('crear + buscarPorId scoped al negocio', async () => {
     const negocio = await Negocio.create({ slug: 'shop-5', nombre: 'Shop 5' });
     const datos = {
@@ -179,6 +174,7 @@ describe('pedidoRepository — CRUD + tenant isolation', () => {
     expect(hallado.pedidoId).toBe('PED-TEST-0001');
   });
 
+  // Verifica que buscarPorId no devuelve el pedido de otro negocio (anti-IDOR)
   it('buscarPorId NO devuelve el pedido de otro negocio (anti-IDOR)', async () => {
     const negA = await Negocio.create({ slug: 'shop-6a', nombre: '6A' });
     const negB = await Negocio.create({ slug: 'shop-6b', nombre: '6B' });
@@ -198,7 +194,6 @@ describe('pedidoRepository — CRUD + tenant isolation', () => {
       total: 59,
     });
 
-    // El negocio B NO debe poder ver el pedido del negocio A
     const cruzado = await pedidoRepo.buscarPorId('PED-TEST-0002', negB._id);
     expect(cruzado).toBeNull();
   });

@@ -1,6 +1,3 @@
-# ═══════════════════════════════════════════════════════════════════
-# LimitRange — defaults para containers sin requests/limits explicitos
-# ═══════════════════════════════════════════════════════════════════
 apiVersion: v1
 kind: LimitRange
 metadata:
@@ -9,10 +6,10 @@ metadata:
 spec:
   limits:
     - type: Container
-      default:        # limits si no se definen
+      default:
         cpu: 500m
         memory: 512Mi
-      defaultRequest: # requests si no se definen
+      defaultRequest:
         cpu: 100m
         memory: 128Mi
       max:

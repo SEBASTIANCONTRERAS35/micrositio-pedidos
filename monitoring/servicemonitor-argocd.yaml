@@ -1,8 +1,3 @@
-# ServiceMonitor para que Prometheus (kube-prometheus-stack) scrape las
-# métricas de ArgoCD. Cubre los 5 componentes que exponen un puerto "metrics":
-# application-controller, server, repo-server, applicationset, notifications.
-#
-# Aplicar: kubectl apply -f monitoring/servicemonitor-argocd.yaml
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:

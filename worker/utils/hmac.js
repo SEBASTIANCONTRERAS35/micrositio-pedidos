@@ -1,16 +1,6 @@
-/**
- * Verificacion de firmas HMAC para webhooks
- * Usa timingSafeEqual para evitar timing attacks
- */
 const crypto = require('crypto');
 
-/**
- * Verifica una firma HMAC-SHA256
- * @param {Buffer|string} body - body crudo del request
- * @param {string} signature - firma recibida (puede tener prefijo tipo 'sha256=...')
- * @param {string} secret - secret compartido
- * @returns {boolean}
- */
+// Verifica una firma HMAC-SHA256 contra el body usando comparacion segura
 function verifyHmacSignature(body, signature, secret) {
   if (!signature || !secret) {
     return false;
@@ -37,12 +27,7 @@ function verifyHmacSignature(body, signature, secret) {
   }
 }
 
-/**
- * Verifica que el timestamp este dentro de una ventana (replay attack prevention)
- * @param {number} timestamp - timestamp Unix en segundos
- * @param {number} toleranceSeconds - ventana de tolerancia (default: 300 = 5 min)
- * @returns {boolean}
- */
+// Verifica que el timestamp este dentro de una ventana (anti replay attack)
 function isTimestampValid(timestamp, toleranceSeconds = 300) {
   const tsNumerico = parseInt(timestamp, 10);
   if (isNaN(tsNumerico)) {
@@ -53,9 +38,7 @@ function isTimestampValid(timestamp, toleranceSeconds = 300) {
   return Math.abs(ahora - tsNumerico) <= toleranceSeconds;
 }
 
-/**
- * Genera firma HMAC para hacer pruebas o llamadas salientes
- */
+// Genera firma HMAC para hacer pruebas o llamadas salientes
 function signHmac(body, secret) {
   return crypto
     .createHmac('sha256', secret)
