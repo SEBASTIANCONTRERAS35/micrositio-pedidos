@@ -81,4 +81,13 @@ router.get('/:slug/pedido/:pedidoId', async (req, res) => {
   });
 });
 
+// Lista "Mis pedidos" del cliente (se rellena en el navegador desde localStorage)
+router.get('/:slug/mis-pedidos', async (req, res) => {
+  const negocio = await Negocio.findOne({ slug: req.params.slug, activo: true }).lean();
+  if (!negocio) {
+    return res.status(404).render('tienda/404', { mensaje: 'Negocio no encontrado' });
+  }
+  res.render('tienda/mis-pedidos', { negocio: { ...negocio, slug: req.params.slug } });
+});
+
 module.exports = router;

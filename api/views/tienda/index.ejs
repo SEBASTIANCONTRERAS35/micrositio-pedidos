@@ -28,6 +28,7 @@ negocio.nombre.charAt(0).toUpperCase() : '?'; const categoriaNames = Object.keys
           </div>
         </div>
         <div class="ct-header__right">
+          <a href="/tienda/<%= negocio.slug %>/mis-pedidos" class="ct-header__phone">Mis pedidos</a>
           <% if (negocio.telefono) { %>
           <a href="tel:<%= negocio.telefono %>" class="ct-header__phone">
             <svg
@@ -83,9 +84,7 @@ negocio.nombre.charAt(0).toUpperCase() : '?'; const categoriaNames = Object.keys
         <% }); %>
       </div>
     </nav>
-    <% } %>
-
-    <% if (negocio.horarios || (negocio.direccion && negocio.direccion.ciudad)) { %>
+    <% } %> <% if (negocio.horarios || (negocio.direccion && negocio.direccion.ciudad)) { %>
     <div class="ct-info-bar">
       <div class="ct-info-bar__inner">
         <% if (negocio.horarios && negocio.horarios.apertura && negocio.horarios.cierre) { %>
@@ -143,9 +142,7 @@ negocio.nombre.charAt(0).toUpperCase() : '?'; const categoriaNames = Object.keys
         </span>
       </div>
     </div>
-    <% } %>
-
-    <% if (promociones && promociones.length > 0) { %>
+    <% } %> <% if (promociones && promociones.length > 0) { %>
     <div class="ct-promo-banner">
       <div class="ct-promo-banner__inner">
         <span class="ct-promo-banner__label">Promociones</span>
@@ -178,9 +175,10 @@ negocio.nombre.charAt(0).toUpperCase() : '?'; const categoriaNames = Object.keys
             >
           </div>
           <div class="ct-grid">
-            <% for (const prod of porCategoria[catNombre]) { %> <% const sinLimite = prod.stock === null || prod.stock === undefined; %> <% const
-            stockNum = sinLimite ? 9999 : prod.stock; %> <% const agotado = !sinLimite && prod.stock
-            <= 0; %> <% const stockBajo = !sinLimite && prod.stock > 0 && prod.stock <= 5; %>
+            <% for (const prod of porCategoria[catNombre]) { %> <% const sinLimite = prod.stock ===
+            null || prod.stock === undefined; %> <% const stockNum = sinLimite ? 9999 : prod.stock;
+            %> <% const agotado = !sinLimite && prod.stock <= 0; %> <% const stockBajo = !sinLimite
+            && prod.stock > 0 && prod.stock <= 5; %>
             <article class="ct-card">
               <div class="ct-card__media">
                 <% if (prod.imagen) { %>

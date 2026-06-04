@@ -56,6 +56,18 @@ function checkoutForm(slug) {
           throw new Error(error.message || 'Error al crear pedido');
         }
         const pedido = await respuesta.json();
+        try {
+          const MIS_KEY = 'mis_pedidos_' + slug;
+          const previos = JSON.parse(localStorage.getItem(MIS_KEY) || '[]');
+          previos.unshift({
+            pedidoId: pedido.pedidoId,
+            total: pedido.total,
+            fecha: new Date().toISOString(),
+          });
+          localStorage.setItem(MIS_KEY, JSON.stringify(previos.slice(0, 50)));
+        } catch (e) {
+          // localStorage no disponible: no bloquea el checkout.
+        }
         localStorage.removeItem(STORAGE_KEY);
         window.location.href = '/tienda/' + slug + '/pedido/' + pedido.pedidoId;
       } catch (e) {

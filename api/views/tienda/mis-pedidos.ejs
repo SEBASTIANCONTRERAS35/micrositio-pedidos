@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es-MX" data-type="<%= negocio.tipo %>">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mis pedidos — <%= negocio.nombre %></title>
+    <link rel="stylesheet" href="/css/tienda.css" />
+    <link rel="stylesheet" href="/css/checkout.css" />
+    <style>
+      .is-oculto {
+        display: none !important;
+      }
+      .mp-wrap {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 24px 16px 48px;
+      }
+      .mp-sub {
+        color: var(--text-3, #64748b);
+        font-size: 14px;
+        margin: 4px 0 20px;
+      }
+      .mp-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        border: 1px solid var(--border, #e2e8f0);
+        border-radius: 12px;
+        margin-bottom: 10px;
+        text-decoration: none;
+        color: inherit;
+      }
+      .mp-item__id {
+        font-weight: 700;
+      }
+      .mp-item__meta {
+        color: var(--text-3, #64748b);
+        font-size: 13px;
+      }
+      .mp-badge {
+        padding: 3px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        background: #eef2ff;
+        color: #4f46e5;
+        white-space: nowrap;
+      }
+      .mp-empty {
+        text-align: center;
+        padding: 40px 0;
+        color: var(--text-3, #64748b);
+      }
+      .mp-empty__icon {
+        font-size: 44px;
+      }
+    </style>
+    <script defer src="/js/mis-pedidos.js"></script>
+  </head>
+  <body data-type="<%= negocio.tipo %>" data-negocio-slug="<%= negocio.slug %>">
+    <main class="mp-wrap">
+      <h1>Mis pedidos</h1>
+      <p class="mp-sub">
+        Pedidos que hiciste en <strong><%= negocio.nombre %></strong> desde este dispositivo.
+      </p>
+
+      <div data-mis-pedidos></div>
+
+      <div data-mis-pedidos-vacio class="mp-empty is-oculto">
+        <div class="mp-empty__icon">🧾</div>
+        <p>Aun no has hecho pedidos en este negocio (en este navegador).</p>
+      </div>
+
+      <a href="/tienda/<%= negocio.slug %>" class="confirmacion-back">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <line x1="19" y1="12" x2="5" y2="12" />
+          <polyline points="12 19 5 12 12 5" />
+        </svg>
+        Volver al catalogo
+      </a>
+    </main>
+  </body>
+</html>
