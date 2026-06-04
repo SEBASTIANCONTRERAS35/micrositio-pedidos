@@ -7,6 +7,7 @@ const hpp = require('hpp');
 const mongoSanitize = require('./middlewares/mongoSanitize');
 const pinoHttp = require('pino-http');
 const mongoose = require('mongoose');
+const { randomUUID } = require('crypto');
 
 const helmetMw = require('./middlewares/helmet');
 const errorHandler = require('./middlewares/errorHandler');
@@ -35,7 +36,37 @@ app.use(
   })
 );
 app.use(compression());
-app.use(pinoHttp({ logger }));
+app.use(
+  pinoHttp({
+    logger,
+    // ID de request: reutiliza x-request-id si el cliente/proxy lo envia,
+    // si no genera un uuid. Permite correlacion end-to-end (HTTP -> jobs).
+    genReqId: (req, res) => {
+      const incoming = req.headers['x-request-id'];
+      const requestId =
+        incoming && String(incoming).trim() ? String(incoming).trim() : randomUUID();
+      // Expone el requestId en la respuesta para que el cliente lo correlacione.
+      res.setHeader('x-request-id', requestId);
+      return requestId;
+    },
+    // Campos comunes en cada log de request (sin PII ni secretos).
+    customProps: (req) => ({
+      ip: req.ip,
+      usuarioId: req.user?.id,
+      negocioId: req.user?.negocioId,
+    }),
+    // Mapea el status a nivel: 5xx error, 4xx warn, resto info.
+    customLogLevel: (req, res, err) => {
+      if (err || res.statusCode >= 500) {
+        return 'error';
+      }
+      if (res.statusCode >= 400) {
+        return 'warn';
+      }
+      return 'info';
+    },
+  })
+);
 app.use(metricsMw.middleware);
 
 app.use((req, res, next) => {
@@ -73,6 +104,20 @@ app.use((req, res) => res.status(404).render('tienda/404', { mensaje: 'Pagina no
 
 app.use(errorHandler);
 
+// Handlers del ciclo de vida de la conexion a MongoDB (caidas en caliente).
+// El 'connected' inicial lo cubre start(); estos cubren cambios posteriores.
+mongoose.connection.on('disconnected', () => {
+  logger.error({ event: 'infra.mongo.desconectado' }, 'Conexion a MongoDB perdida');
+});
+mongoose.connection.on('reconnected', () => {
+  logger.info({ event: 'infra.mongo.reconectado' }, 'Conexion a MongoDB restablecida');
+});
+mongoose.connection.on('error', (err) => {
+  logger.error({ event: 'infra.mongo.error', err }, 'Error en la conexion a MongoDB');
+});
+
+let httpServer = null;
+
 // Conecta a MongoDB y arranca el servidor HTTP
 async function start() {
   try {
@@ -84,33 +129,55 @@ async function start() {
     await mongoose.connect(mongoUri, {
       serverSelectionTimeoutMS: 10000,
     });
-    logger.info('MongoDB conectado');
+    logger.info({ event: 'infra.mongo.conectado' }, 'Conexion a MongoDB establecida');
 
     const PORT = parseInt(process.env.PORT || '3000', 10);
-    app.listen(PORT, '0.0.0.0', () => {
-      logger.info(`API escuchando en puerto ${PORT}`);
+    httpServer = app.listen(PORT, '0.0.0.0', () => {
+      logger.info(
+        { event: 'infra.boot', port: PORT, nodeEnv: process.env.NODE_ENV || 'development' },
+        `API escuchando en el puerto ${PORT}`
+      );
     });
   } catch (err) {
-    logger.error({ err }, 'Error al iniciar el servidor');
+    logger.error({ event: 'infra.boot', err }, 'No se pudo iniciar la API');
     process.exit(1);
   }
 }
 
-// Cierra mongoose y termina el proceso ante una senal
+let cerrando = false;
+
+// Cierra ordenadamente el servidor HTTP y mongoose ante una senal del sistema.
 async function shutdown(signal) {
-  logger.info({ signal }, 'Cerrando servidor...');
+  if (cerrando) {
+    return;
+  }
+  cerrando = true;
+  logger.info({ event: 'infra.shutdown', signal }, `Apagando la API (senal ${signal})`);
   try {
+    if (httpServer) {
+      await new Promise((resolve) => httpServer.close(resolve));
+    }
     await mongoose.disconnect();
+    logger.info({ event: 'infra.shutdown', signal }, 'API apagada limpiamente');
   } catch (e) {
-    logger.error({ err: e }, 'Error cerrando mongoose');
+    logger.error({ event: 'infra.shutdown', err: e }, 'Error durante el apagado de la API');
   }
   process.exit(0);
 }
 
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+// Excepciones no controladas: log fatal/error y salida para que el orquestador
+// reinicie el pod en un estado limpio (no seguir en un estado corrupto).
+process.on('uncaughtException', (err) => {
+  logger.fatal({ event: 'infra.uncaught', err }, 'Excepcion no capturada en la API');
+  process.exit(1);
+});
 process.on('unhandledRejection', (reason) => {
-  logger.error({ reason }, 'Unhandled rejection');
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  logger.error({ event: 'infra.uncaught', err }, 'Promesa rechazada sin manejar en la API');
+  process.exit(1);
 });
 
 if (require.main === module) {

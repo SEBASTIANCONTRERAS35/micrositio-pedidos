@@ -10,7 +10,22 @@ const redis = new Redis({
   retryStrategy: (times) => Math.min(times * 100, 3000),
 });
 
-redis.on('error', (err) => logger.error({ err }, 'Redis connection error'));
-redis.on('connect', () => logger.info('Redis connected'));
+// Listeners del ciclo de vida de Redis. Nunca exponen la password
+// (no se loguea la config de conexion, solo el evento y el error serializado).
+redis.on('connect', () => {
+  logger.info({ event: 'infra.redis.conectado' }, 'Conexion a Redis iniciada');
+});
+redis.on('ready', () => {
+  logger.info({ event: 'infra.redis.conectado' }, 'Redis listo para recibir comandos');
+});
+redis.on('error', (err) => {
+  logger.error({ event: 'infra.redis.error', err }, 'Error en la conexion a Redis');
+});
+redis.on('reconnecting', (delayMs) => {
+  logger.warn({ event: 'infra.redis.reconectando', delayMs }, 'Reintentando conexion a Redis');
+});
+redis.on('end', () => {
+  logger.warn({ event: 'infra.redis.error' }, 'Conexion a Redis cerrada');
+});
 
 module.exports = redis;

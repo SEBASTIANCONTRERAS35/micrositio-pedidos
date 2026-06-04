@@ -57,6 +57,7 @@ router.post('/', publicLimiter, idempotency, validate(PedidoSchema), async (req,
     const pedido = await crearPedidoConStock({
       ...req.body,
       idempotencyKey: req.headers['idempotency-key'] || null,
+      requestId: req.id,
     });
     res.status(201).json({
       pedidoId: pedido.pedidoId,
@@ -88,10 +89,32 @@ router.get(
       const pedido = await Pedido.findOne({ pedidoId: req.params.pedidoId })
         .select('estado historial delivery negocioId')
         .lean();
-      if (!pedido || !perteneceANegocio(pedido, negocio)) {
+      if (!pedido) {
+        throw new NotFoundError('Pedido no encontrado');
+      }
+      if (!perteneceANegocio(pedido, negocio)) {
+        // El pedido existe pero NO pertenece al negocio del slug: intento de IDOR.
+        req.log.warn(
+          {
+            event: 'pedido.tracking.idor',
+            pedidoId: req.params.pedidoId,
+            negocioSlug: slug,
+            ip: req.ip,
+          },
+          'Tracking rechazado: el pedido no pertenece al negocio (posible IDOR)'
+        );
         throw new NotFoundError('Pedido no encontrado');
       }
 
+      req.log.debug(
+        {
+          event: 'pedido.tracking.consulta',
+          pedidoId: req.params.pedidoId,
+          negocioSlug: slug,
+          estado: pedido.estado,
+        },
+        'Consulta publica de tracking de pedido'
+      );
       res.json(proyectarEstadoPublico(pedido));
     } catch (e) {
       next(e);
@@ -102,7 +125,7 @@ router.get(
 // Confirma un pedido del negocio del dueno autenticado.
 router.post('/:id/confirmar', requireAuth, async (req, res, next) => {
   try {
-    const pedido = await confirmarPedido(req.params.id, req.user.id, req.user.negocioId);
+    const pedido = await confirmarPedido(req.params.id, req.user.id, req.user.negocioId, req.id);
     res.json({ pedidoId: pedido.pedidoId, estado: pedido.estado });
   } catch (e) {
     next(e);
@@ -112,7 +135,7 @@ router.post('/:id/confirmar', requireAuth, async (req, res, next) => {
 // Cancela un pedido del negocio del dueno autenticado.
 router.post('/:id/cancelar', requireAuth, async (req, res, next) => {
   try {
-    const pedido = await cancelarPedido(req.params.id, req.user.id, req.user.negocioId);
+    const pedido = await cancelarPedido(req.params.id, req.user.id, req.user.negocioId, req.id);
     res.json({ pedidoId: pedido.pedidoId, estado: pedido.estado });
   } catch (e) {
     next(e);

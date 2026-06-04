@@ -1,14 +1,23 @@
 'use strict';
 
 const Pedido = require('../../models/pedido');
+const logger = require('../../utils/logger');
 
 // Crea un pedido (fuera de transaccion).
 async function crear(datos) {
+  logger.debug(
+    { event: 'pedido.persistido', pedidoId: datos && datos.pedidoId, enSession: false },
+    'Persistiendo pedido (sin transaccion)'
+  );
   return Pedido.create(datos);
 }
 
 // Crea un pedido dentro de una transaccion con session.
 async function crearEnSession(datos, session) {
+  logger.debug(
+    { event: 'pedido.persistido', pedidoId: datos && datos.pedidoId, enSession: true },
+    'Persistiendo pedido dentro de la transaccion'
+  );
   const [pedido] = await Pedido.create([datos], { session });
   return pedido;
 }

@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const redis = require('../services/redis');
-const logger = require('../utils/logger');
+const baseLogger = require('../utils/logger');
 
 const TTL = 24 * 60 * 60;
 
@@ -14,6 +14,8 @@ function hashBody(body) {
 
 // Middleware que cachea respuestas por Idempotency-Key atado al hash del body.
 async function idempotency(req, res, next) {
+  // Usa el child logger del request (requestId/usuarioId/negocioId) si existe.
+  const log = req.log || baseLogger;
   const key = req.headers['idempotency-key'];
   if (!key) {
     return next();
@@ -27,17 +29,44 @@ async function idempotency(req, res, next) {
     if (cacheado) {
       const parseado = JSON.parse(cacheado);
       if (parseado.bodyHash !== bodyHash) {
-        logger.warn({ idempotencyKey: key }, 'Idempotency-Key reusado con body distinto');
+        // Mismo Idempotency-Key con cuerpo distinto: posible error del cliente.
+        log.warn(
+          {
+            event: 'idempotency.conflicto',
+            idempotencyKey: key,
+            requestId: req.id,
+            path: req.path,
+          },
+          'Idempotency-Key reusado con un cuerpo de peticion distinto'
+        );
         return res.status(422).json({
           error: 'IDEMPOTENCY_KEY_REUSED',
           message: 'El Idempotency-Key ya se uso con un cuerpo de peticion distinto.',
         });
       }
-      logger.info({ idempotencyKey: key }, 'Idempotency hit');
+      // Replay de una respuesta ya cacheada (idempotencia funcionando).
+      log.info(
+        {
+          event: 'idempotency.replay',
+          idempotencyKey: key,
+          requestId: req.id,
+          path: req.path,
+          status: parseado.status,
+        },
+        'Respuesta servida desde cache de idempotencia'
+      );
       return res.status(parseado.status).json(parseado.body);
     }
+    // No habia respuesta cacheada: la peticion se procesa por primera vez.
+    log.debug(
+      { event: 'idempotency.miss', idempotencyKey: key, requestId: req.id, path: req.path },
+      'Idempotency-Key sin respuesta previa; procesando peticion'
+    );
   } catch (err) {
-    logger.error({ err, idempotencyKey: key }, 'Idempotency check failed');
+    log.error(
+      { event: 'idempotency.error', err, idempotencyKey: key, requestId: req.id, path: req.path },
+      'Fallo al consultar la cache de idempotencia'
+    );
   }
 
   const jsonOriginal = res.json.bind(res);
@@ -46,7 +75,12 @@ async function idempotency(req, res, next) {
     if (res.statusCode >= 200 && res.statusCode < 300) {
       redis
         .set(redisKey, JSON.stringify({ status: res.statusCode, body, bodyHash }), 'EX', TTL, 'NX')
-        .catch((err) => logger.error({ err }, 'Failed to cache idempotent response'));
+        .catch((err) =>
+          log.error(
+            { event: 'idempotency.error', err, idempotencyKey: key, requestId: req.id },
+            'Fallo al cachear la respuesta idempotente'
+          )
+        );
     }
     return jsonOriginal(body);
   };

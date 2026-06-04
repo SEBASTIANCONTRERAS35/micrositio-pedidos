@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { verifyHmacSignature, isTimestampValid } = require('../../../utils/hmac');
+const logger = require('../../../utils/logger');
 const { construirOrigenEnvio } = require('../../../domain/envio');
 
 const IS_MOCK = process.env.LALAMOVE_MOCK !== 'false';
@@ -22,6 +23,10 @@ function firmarLalamove(method, path, body = '') {
 // Solicita un envio a Lalamove (mock o real con HMAC) y devuelve sus datos.
 async function requestDelivery(pedido, negocio) {
   if (IS_MOCK) {
+    logger.debug(
+      { event: 'delivery.solicitado', provider: 'lalamove', pedidoId: pedido.pedidoId, mock: true },
+      'Lalamove en modo mock: respuesta simulada de repartidor'
+    );
     return {
       deliveryId: `lalamove-mock-${pedido.pedidoId}`,
       trackingUrl: `https://mock.lalamove.com/track/${pedido.pedidoId}`,
@@ -42,21 +47,59 @@ async function requestDelivery(pedido, negocio) {
   });
 
   const { header } = firmarLalamove('POST', '/v3/orders', body);
-  const respuesta = await fetch(`${BASE_URL}/orders`, {
-    method: 'POST',
-    headers: {
-      Authorization: header,
-      'Content-Type': 'application/json',
-      Market: 'MX',
-    },
-    body,
-  });
+  const inicio = Date.now();
+  let respuesta;
+  try {
+    respuesta = await fetch(`${BASE_URL}/orders`, {
+      method: 'POST',
+      headers: {
+        Authorization: header,
+        'Content-Type': 'application/json',
+        Market: 'MX',
+      },
+      body,
+    });
+  } catch (err) {
+    logger.error(
+      {
+        event: 'delivery.carrier.error',
+        provider: 'lalamove',
+        pedidoId: pedido.pedidoId,
+        durationMs: Date.now() - inicio,
+        err: err.message,
+      },
+      'Fallo de red al solicitar repartidor a Lalamove'
+    );
+    throw err;
+  }
+  const durationMs = Date.now() - inicio;
 
   if (!respuesta.ok) {
+    logger.error(
+      {
+        event: 'delivery.carrier.error',
+        provider: 'lalamove',
+        pedidoId: pedido.pedidoId,
+        httpStatus: respuesta.status,
+        durationMs,
+      },
+      'Lalamove rechazo la solicitud de repartidor'
+    );
     throw new Error(`Lalamove returned ${respuesta.status}: ${await respuesta.text()}`);
   }
   const datos = await respuesta.json();
 
+  logger.info(
+    {
+      event: 'delivery.solicitado',
+      provider: 'lalamove',
+      pedidoId: pedido.pedidoId,
+      deliveryId: datos.orderId,
+      httpStatus: respuesta.status,
+      durationMs,
+    },
+    'Repartidor solicitado a Lalamove'
+  );
   return {
     deliveryId: datos.orderId,
     trackingUrl: datos.shareLink,
@@ -72,13 +115,35 @@ async function getStatus(deliveryId) {
   }
   const id = encodeURIComponent(deliveryId);
   const { header } = firmarLalamove('GET', `/v3/orders/${id}`);
+  const inicio = Date.now();
   const respuesta = await fetch(`${BASE_URL}/orders/${id}`, {
     headers: { Authorization: header, Market: 'MX' },
   });
+  const durationMs = Date.now() - inicio;
   if (!respuesta.ok) {
+    logger.error(
+      {
+        event: 'delivery.carrier.error',
+        provider: 'lalamove',
+        deliveryId,
+        httpStatus: respuesta.status,
+        durationMs,
+      },
+      'Lalamove fallo al consultar estado del envio'
+    );
     throw new Error(`Lalamove status returned ${respuesta.status}`);
   }
   const datos = await respuesta.json();
+  logger.debug(
+    {
+      event: 'delivery.solicitado',
+      provider: 'lalamove',
+      deliveryId,
+      httpStatus: respuesta.status,
+      durationMs,
+    },
+    'Estado de envio consultado en Lalamove'
+  );
   return { estado: mapEstado(datos.status || (datos.order && datos.order.status)) };
 }
 
@@ -89,10 +154,35 @@ async function cancelDelivery(deliveryId) {
   }
   const id = encodeURIComponent(deliveryId);
   const { header } = firmarLalamove('DELETE', `/v3/orders/${id}`);
+  const inicio = Date.now();
   const respuesta = await fetch(`${BASE_URL}/orders/${id}`, {
     method: 'DELETE',
     headers: { Authorization: header, Market: 'MX' },
   });
+  const durationMs = Date.now() - inicio;
+  if (!respuesta.ok) {
+    logger.error(
+      {
+        event: 'delivery.carrier.error',
+        provider: 'lalamove',
+        deliveryId,
+        httpStatus: respuesta.status,
+        durationMs,
+      },
+      'Lalamove fallo al cancelar el envio'
+    );
+  } else {
+    logger.info(
+      {
+        event: 'delivery.cancelado',
+        provider: 'lalamove',
+        deliveryId,
+        httpStatus: respuesta.status,
+        durationMs,
+      },
+      'Envio cancelado en Lalamove'
+    );
+  }
   return { ok: respuesta.ok };
 }
 

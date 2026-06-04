@@ -2,6 +2,12 @@
 
 const mongoose = require('mongoose');
 const Producto = require('../../models/producto');
+const logger = require('../../utils/logger');
+
+// Resume el snapshot/productos a [{ id, cantidad }] para loguear sin PII ni precios.
+function resumirItems(items) {
+  return (items || []).map((p) => ({ id: String(p.id), cantidad: p.cantidad }));
+}
 
 // Filtra ids dejando solo ObjectId de Mongo validos, convertidos a ObjectId.
 function idsObjectIdValidos(ids) {
@@ -24,7 +30,8 @@ async function buscarActivosPorIds(ids, negocioId) {
 }
 
 // Descuenta stock de forma atomica y condicional dentro de una transaccion.
-async function descontarStock(snapshot, session) {
+// ctx (opcional) lleva pedidoId/negocioId solo para correlacionar el log.
+async function descontarStock(snapshot, session, ctx = {}) {
   const resultado = await Producto.bulkWrite(
     snapshot.map((p) => ({
       updateOne: {
@@ -34,11 +41,23 @@ async function descontarStock(snapshot, session) {
     })),
     { session }
   );
-  return resultado.modifiedCount === snapshot.length;
+  const exito = resultado.modifiedCount === snapshot.length;
+  logger.info(
+    {
+      event: 'stock.descontado',
+      pedidoId: ctx.pedidoId,
+      negocioId: ctx.negocioId,
+      items: resumirItems(snapshot),
+      exito,
+    },
+    'Stock descontado dentro de la transaccion del pedido'
+  );
+  return exito;
 }
 
 // Devuelve stock al cancelar un pedido (incondicional).
-async function devolverStock(productos, session) {
+// ctx (opcional) lleva pedidoId/negocioId solo para correlacionar el log.
+async function devolverStock(productos, session, ctx = {}) {
   await Producto.bulkWrite(
     productos.map((p) => ({
       updateOne: {
@@ -47,6 +66,15 @@ async function devolverStock(productos, session) {
       },
     })),
     { session }
+  );
+  logger.info(
+    {
+      event: 'stock.devuelto',
+      pedidoId: ctx.pedidoId,
+      negocioId: ctx.negocioId,
+      items: resumirItems(productos),
+    },
+    'Stock devuelto al cancelar el pedido'
   );
 }
 

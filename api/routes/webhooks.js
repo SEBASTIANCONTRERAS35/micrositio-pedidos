@@ -5,7 +5,6 @@ const zuyu = require('../services/zuyu');
 const { webhookLimiter } = require('../middlewares/rateLimit');
 const { WebhookSignatureError } = require('../utils/errors');
 const { verifyZuyuSignature } = require('../utils/hmac');
-const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -34,6 +33,10 @@ router.post(
     try {
       const provider = req.query.provider || req.headers['x-provider'];
       if (!provider) {
+        req.log.warn(
+          { event: 'webhook.delivery.firma_invalida', ip: req.ip, motivo: 'provider_ausente' },
+          'Webhook de delivery rechazado: provider no especificado'
+        );
         throw new WebhookSignatureError('Provider no especificado');
       }
 
@@ -41,22 +44,39 @@ router.post(
 
       const valida = delivery.verifyWebhook(provider, rawBody, req.headers);
       if (!valida) {
+        req.log.warn(
+          {
+            event: 'webhook.delivery.firma_invalida',
+            provider,
+            ip: req.ip,
+            motivo: 'firma_invalida',
+          },
+          'Webhook de delivery rechazado: firma invalida'
+        );
         throw new WebhookSignatureError();
       }
 
       const parseado = JSON.parse(rawBody);
       const event = delivery.parseWebhook(provider, parseado);
 
-      logger.info(
-        { provider, deliveryId: event.deliveryId, estado: event.estado },
-        'Webhook recibido'
+      const jobId = `${event.deliveryId}-${event.estado}`;
+
+      req.log.info(
+        {
+          event: 'webhook.delivery.recibido',
+          provider,
+          deliveryId: event.deliveryId,
+          estado: event.estado,
+          jobId,
+        },
+        'Webhook de delivery recibido'
       );
 
       await colaWebhooks.add(
         'process-webhook',
-        { provider, event, receivedAt: Date.now() },
+        { provider, event, receivedAt: Date.now(), requestId: req.id },
         {
-          jobId: `${event.deliveryId}-${event.estado}`,
+          jobId,
           removeOnComplete: 100,
           removeOnFail: 50,
         }
@@ -97,16 +117,32 @@ router.post(
       const cfg = await zuyu.resolverConfig(negocioSlug);
       const secrets = [cfg.webhookSecret, cfg.webhookSecretPrevio].filter(Boolean);
       if (secrets.length === 0) {
-        logger.warn({ negocioSlug }, 'Webhook ZUYU rechazado: negocio sin webhook secret');
+        req.log.warn(
+          { event: 'webhook.rechazado', negocioSlug, ip: req.ip, motivo: 'sin_webhook_secret' },
+          'Webhook ZUYU rechazado: negocio sin webhook secret'
+        );
         throw new WebhookSignatureError('Webhook secret no configurado para este negocio');
       }
       if (!verifyZuyuSignature(rawBody, signatureHeader, secrets)) {
+        req.log.warn(
+          {
+            event: 'webhook.zuyu.firma_invalida',
+            negocioSlug,
+            eventType,
+            ip: req.ip,
+            motivo: 'firma_invalida',
+          },
+          'Webhook ZUYU rechazado: firma HMAC invalida o expirada'
+        );
         throw new WebhookSignatureError('Firma de webhook ZUYU invalida o expirada');
       }
 
       const idemId = eventId || eventIdHeader || `${negocioSlug}:${eventType}:${Date.now()}`;
 
-      logger.info({ eventType, negocioSlug, eventId: idemId }, 'Webhook ZUYU recibido');
+      req.log.info(
+        { event: 'webhook.zuyu.recibido', eventType, negocioSlug, eventId: idemId, jobId: idemId },
+        'Webhook ZUYU recibido'
+      );
 
       await colaZuyu.add(
         'sync',
@@ -116,6 +152,7 @@ router.post(
           payload: data,
           eventId: idemId,
           receivedAt: Date.now(),
+          requestId: req.id,
         },
         {
           jobId: idemId,

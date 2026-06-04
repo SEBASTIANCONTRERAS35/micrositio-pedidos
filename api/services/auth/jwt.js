@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const fs = require('fs');
 const redis = require('../redis');
+const logger = require('../../utils/logger');
 const { AuthenticationError } = require('../../utils/errors');
 
 const ACCESS_TTL = process.env.JWT_ACCESS_TOKEN_TTL || '15m';
@@ -65,6 +66,12 @@ async function issueRefreshToken(userId) {
 async function rotateRefreshToken(oldToken) {
   const userId = await redis.get(`refresh:${oldToken}`);
   if (!userId) {
+    // Seguridad: refresh token desconocido (expirado/ya rotado/posible robo).
+    // No se loguea el token; solo el evento para alertar reuso.
+    logger.warn(
+      { event: 'auth.refresh.fail', motivo: 'token_no_encontrado' },
+      'Rotacion rechazada: refresh token invalido o expirado'
+    );
     throw new AuthenticationError('Refresh token invalido o expirado');
   }
   await redis.del(`refresh:${oldToken}`);
@@ -81,6 +88,12 @@ function verifyAccessToken(token) {
   try {
     return jwt.verify(token, publicKey, { algorithms: ['RS256'] });
   } catch (err) {
+    // Seguridad: token invalido/expirado/firma incorrecta. Se loguea solo el
+    // motivo (err.message de la libreria), NUNCA el token en si.
+    logger.warn(
+      { event: 'auth.token.invalido', motivo: err.message },
+      'Verificacion de access token fallida'
+    );
     throw new AuthenticationError(`Token invalido: ${err.message}`);
   }
 }

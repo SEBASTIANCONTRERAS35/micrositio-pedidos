@@ -1,5 +1,7 @@
 'use strict';
 
+const logger = require('../utils/logger');
+
 const COORDENADAS_FALLBACK = Object.freeze({ lat: 19.4326, lng: -99.1332 });
 
 // Une los campos de una dirección estructurada en una línea legible.
@@ -19,6 +21,17 @@ function construirOrigenEnvio(negocio) {
   const direccion = formatearDireccion(n.direccion);
   const ubic = n.ubicacion || {};
   const tieneCoords = Number.isFinite(ubic.lat) && Number.isFinite(ubic.lng);
+  if (!tieneCoords) {
+    logger.warn(
+      {
+        event: 'delivery.origen.fallback',
+        negocioId: n._id ? String(n._id) : undefined,
+        negocioSlug: n.slug,
+        usaFallback: true,
+      },
+      'Negocio sin coordenadas: se usa COORDENADAS_FALLBACK (CDMX) para el origen del envio'
+    );
+  }
   return {
     address: direccion || 'Dirección del negocio no configurada',
     name: (typeof n.nombre === 'string' && n.nombre.trim()) || 'Negocio',

@@ -17,7 +17,10 @@ function getProvider(name) {
 // Solicita un repartidor al carrier indicado
 async function requestDelivery(providerName, pedido) {
   const proveedor = getProvider(providerName);
-  logger.info({ pedidoId: pedido.pedidoId, providerName }, 'Solicitando repartidor');
+  logger.info(
+    { event: 'delivery.solicitado', pedidoId: pedido.pedidoId, provider: providerName },
+    'Solicitando repartidor al carrier'
+  );
   return proveedor.requestDelivery(pedido);
 }
 

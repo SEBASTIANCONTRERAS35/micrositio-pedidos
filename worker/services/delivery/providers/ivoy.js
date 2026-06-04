@@ -8,6 +8,10 @@ const IS_MOCK = process.env.IVOY_MOCK === 'true';
 // Crea una orden de envio en iVoy (o respuesta mock) y devuelve sus datos.
 async function requestDelivery(pedido, negocio) {
   if (IS_MOCK) {
+    logger.debug(
+      { event: 'delivery.solicitado', provider: 'ivoy', pedidoId: pedido.pedidoId, mock: true },
+      'iVoy en modo mock: respuesta simulada de repartidor'
+    );
     return mockResponse(pedido);
   }
 
@@ -16,34 +20,73 @@ async function requestDelivery(pedido, negocio) {
   );
   const origen = construirOrigenEnvio(negocio);
 
-  const respuesta = await fetch(`${BASE_URL}/express/orders`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${credencial}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      pickup: {
-        address: origen.address,
+  const inicio = Date.now();
+  let respuesta;
+  try {
+    respuesta = await fetch(`${BASE_URL}/express/orders`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${credencial}`,
+        'Content-Type': 'application/json',
       },
-      dropoff: {
-        address: pedido.cliente.direccion,
-        contact: {
-          name: pedido.cliente.nombre,
-          phone: pedido.cliente.telefono,
+      body: JSON.stringify({
+        pickup: {
+          address: origen.address,
         },
+        dropoff: {
+          address: pedido.cliente.direccion,
+          contact: {
+            name: pedido.cliente.nombre,
+            phone: pedido.cliente.telefono,
+          },
+        },
+        reference: pedido.pedidoId,
+      }),
+    });
+  } catch (err) {
+    logger.error(
+      {
+        event: 'delivery.carrier.error',
+        provider: 'ivoy',
+        pedidoId: pedido.pedidoId,
+        durationMs: Date.now() - inicio,
+        err: err.message,
       },
-      reference: pedido.pedidoId,
-    }),
-  });
+      'Fallo de red al solicitar repartidor a iVoy'
+    );
+    throw err;
+  }
+  const durationMs = Date.now() - inicio;
 
   if (!respuesta.ok) {
+    logger.error(
+      {
+        event: 'delivery.carrier.error',
+        provider: 'ivoy',
+        pedidoId: pedido.pedidoId,
+        httpStatus: respuesta.status,
+        durationMs,
+      },
+      'iVoy rechazo la solicitud de repartidor'
+    );
     throw new Error(`iVoy returned ${respuesta.status}: ${await respuesta.text()}`);
   }
 
   const datos = await respuesta.json();
+  const deliveryId = datos.id || datos.orderId;
+  logger.info(
+    {
+      event: 'delivery.solicitado',
+      provider: 'ivoy',
+      pedidoId: pedido.pedidoId,
+      deliveryId,
+      httpStatus: respuesta.status,
+      durationMs,
+    },
+    'Repartidor solicitado a iVoy'
+  );
   return {
-    deliveryId: datos.id || datos.orderId,
+    deliveryId,
     trackingUrl: datos.trackingUrl,
     estado: 'pending',
     costoEnvio: datos.cost || 49,
@@ -60,14 +103,36 @@ async function getStatus(deliveryId) {
     'base64'
   );
 
+  const inicio = Date.now();
   const respuesta = await fetch(`${BASE_URL}/express/orders/${deliveryId}`, {
     headers: { Authorization: `Basic ${credencial}` },
   });
+  const durationMs = Date.now() - inicio;
 
   if (!respuesta.ok) {
+    logger.error(
+      {
+        event: 'delivery.carrier.error',
+        provider: 'ivoy',
+        deliveryId,
+        httpStatus: respuesta.status,
+        durationMs,
+      },
+      'iVoy fallo al consultar estado del envio'
+    );
     throw new Error(`iVoy status returned ${respuesta.status}`);
   }
   const datos = await respuesta.json();
+  logger.debug(
+    {
+      event: 'delivery.solicitado',
+      provider: 'ivoy',
+      deliveryId,
+      httpStatus: respuesta.status,
+      durationMs,
+    },
+    'Estado de envio consultado en iVoy'
+  );
   return { estado: mapEstado(datos.status) };
 }
 
@@ -79,6 +144,7 @@ async function cancelDelivery(deliveryId) {
   const credencial = Buffer.from(`${process.env.IVOY_USER}:${process.env.IVOY_PASSWORD}`).toString(
     'base64'
   );
+  const inicio = Date.now();
   const respuesta = await fetch(
     `${BASE_URL}/express/orders/${encodeURIComponent(deliveryId)}/cancel`,
     {
@@ -86,9 +152,30 @@ async function cancelDelivery(deliveryId) {
       headers: { Authorization: `Basic ${credencial}` },
     }
   );
+  const durationMs = Date.now() - inicio;
   if (!respuesta.ok) {
+    logger.error(
+      {
+        event: 'delivery.carrier.error',
+        provider: 'ivoy',
+        deliveryId,
+        httpStatus: respuesta.status,
+        durationMs,
+      },
+      'iVoy fallo al cancelar el envio'
+    );
     return { ok: false, reason: `iVoy cancel respondió ${respuesta.status}` };
   }
+  logger.info(
+    {
+      event: 'delivery.cancelado',
+      provider: 'ivoy',
+      deliveryId,
+      httpStatus: respuesta.status,
+      durationMs,
+    },
+    'Envio cancelado en iVoy'
+  );
   return { ok: true };
 }
 

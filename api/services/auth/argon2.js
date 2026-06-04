@@ -1,4 +1,5 @@
 const argon2 = require('argon2');
+const logger = require('../../utils/logger');
 
 const HASH_OPTIONS = {
   type: argon2.argon2id,
@@ -16,7 +17,14 @@ async function hashPassword(textoPlano) {
 async function verifyPassword(hash, textoPlano) {
   try {
     return await argon2.verify(hash, textoPlano);
-  } catch {
+  } catch (err) {
+    // Una excepcion aqui suele indicar un hash mal formado/corrupto en BD
+    // (no un password incorrecto, que argon2 devuelve como false). Se loguea
+    // solo el motivo; NUNCA el hash ni la contrasena.
+    logger.warn(
+      { event: 'auth.password.verify_error', motivo: err.message },
+      'Fallo al verificar la contrasena (posible hash corrupto)'
+    );
     return false;
   }
 }

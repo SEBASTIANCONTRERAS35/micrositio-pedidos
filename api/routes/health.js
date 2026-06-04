@@ -33,6 +33,13 @@ router.get('/ready', async (req, res) => {
   }
 
   const listo = chequeos.mongo && chequeos.redis;
+  if (!listo) {
+    const dependenciasCaidas = Object.keys(chequeos).filter((dep) => !chequeos[dep]);
+    req.log.warn(
+      { event: 'health.degradado', checks: chequeos, dependenciasCaidas },
+      'Readiness degradado: una dependencia no responde'
+    );
+  }
   res.status(listo ? 200 : 503).json({ status: listo ? 'ready' : 'not_ready', checks: chequeos });
 });
 

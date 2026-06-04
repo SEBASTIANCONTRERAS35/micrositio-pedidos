@@ -36,6 +36,15 @@ router.get('/api/integracion', requireAuth, async (req, res, next) => {
       return res.status(404).json({ message: 'Negocio no encontrado' });
     }
     const z = negocio.zuyuConfig || {};
+    req.log.info(
+      {
+        event: 'integracion.consultada',
+        usuarioId: req.user.id,
+        negocioId: req.user.negocioId,
+        conectado: z.conectado === true,
+      },
+      'Integracion ZUYU consultada por el dueno'
+    );
     res.json({
       conectado: z.conectado === true,
       baseUrl: z.baseUrl || '',
@@ -69,6 +78,15 @@ router.put('/api/integracion', requireAuth, validate(IntegracionSchema), async (
       try {
         await assertSafeUrl(baseUrl);
       } catch (e) {
+        req.log.warn(
+          {
+            event: 'integracion.rechazada',
+            usuarioId: req.user.id,
+            negocioId: req.user.negocioId,
+            motivo: 'url_insegura',
+          },
+          'Integracion ZUYU rechazada: URL insegura (SSRF)'
+        );
         return res.status(400).json({ message: `URL de ZUYU rechazada: ${e.message}` });
       }
       zc.baseUrl = baseUrl.trim();
@@ -89,6 +107,15 @@ router.put('/api/integracion', requireAuth, validate(IntegracionSchema), async (
 
     if (conectado === true) {
       if (!zc.apiKey) {
+        req.log.warn(
+          {
+            event: 'integracion.rechazada',
+            usuarioId: req.user.id,
+            negocioId: req.user.negocioId,
+            motivo: 'sin_api_key',
+          },
+          'Integracion ZUYU rechazada: intento de conectar sin API key'
+        );
         return res.status(400).json({
           message: 'Configura el API key antes de conectar con ZUYU',
         });
@@ -101,6 +128,19 @@ router.put('/api/integracion', requireAuth, validate(IntegracionSchema), async (
     zc.actualizadoEn = new Date();
     negocio.markModified('zuyuConfig');
     await negocio.save();
+
+    req.log.info(
+      {
+        event: 'integracion.actualizada',
+        usuarioId: req.user.id,
+        negocioId: req.user.negocioId,
+        conectado: zc.conectado === true,
+        baseUrlActualizada: baseUrl !== undefined && baseUrl !== '',
+        apiKeyRotada: !!apiKey,
+        webhookSecretRotado: !!webhookSecret,
+      },
+      'Integracion ZUYU actualizada por el dueno'
+    );
 
     res.json({
       ok: true,
@@ -123,6 +163,15 @@ router.get('/api/pedidos', requireAuth, async (req, res, next) => {
       .sort({ creadoEn: -1 })
       .limit(100)
       .lean();
+    req.log.info(
+      {
+        event: 'panel.pedidos.listados',
+        usuarioId: req.user.id,
+        negocioId: req.user.negocioId,
+        count: pedidos.length,
+      },
+      'Pedidos del negocio listados por el dueno'
+    );
     res.json(pedidos);
   } catch (e) {
     next(e);
@@ -136,6 +185,10 @@ router.get('/api/me', requireAuth, async (req, res, next) => {
       Usuario.findById(req.user.id).lean(),
       Negocio.findById(req.user.negocioId).lean(),
     ]);
+    req.log.debug(
+      { event: 'panel.me.consultado', usuarioId: req.user.id, negocioId: req.user.negocioId },
+      'Sesion del dueno consultada (/me)'
+    );
     res.json({ usuario, negocio });
   } catch (e) {
     next(e);

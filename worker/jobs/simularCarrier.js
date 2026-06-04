@@ -29,12 +29,24 @@ module.exports = async (job, logger) => {
 
   const pasoActual = pasos[paso];
   if (!pasoActual) {
-    logger.warn({ pedidoId, paso }, 'Carrier simulado: paso fuera de rango — ignorado');
+    logger.warn(
+      {
+        event: 'delivery.solicitado',
+        sim: true,
+        pedidoId,
+        deliveryId,
+        provider,
+        paso,
+        motivo: 'paso_fuera_de_rango',
+      },
+      'Carrier simulado: paso fuera de rango — ignorado'
+    );
     return { ok: false, reason: 'paso fuera de rango' };
   }
 
   await colaWebhookDelivery.add('webhook-mock', {
     provider,
+    requestId: job.data.requestId,
     event: {
       deliveryId,
       estado: pasoActual.estado,
@@ -42,14 +54,38 @@ module.exports = async (job, logger) => {
     },
   });
 
-  logger.info({ pedidoId, paso }, 'Carrier simulado: emitiendo evento');
+  logger.info(
+    {
+      event: 'delivery.solicitado',
+      sim: true,
+      pedidoId,
+      deliveryId,
+      provider,
+      paso,
+      estado: pasoActual.estado,
+    },
+    'Carrier simulado: emitiendo evento del paso'
+  );
 
   const siguiente = paso + 1;
   if (pasos[siguiente]) {
     await colaSimularCarrier.add(
       'simular-carrier',
-      { pedidoId, deliveryId, provider, paso: siguiente },
+      { pedidoId, deliveryId, provider, paso: siguiente, requestId: job.data.requestId },
       { delay: 6000 }
+    );
+    logger.info(
+      {
+        event: 'delivery.solicitado',
+        sim: true,
+        pedidoId,
+        deliveryId,
+        provider,
+        paso,
+        siguientePaso: siguiente,
+        delayMs: 6000,
+      },
+      'Carrier simulado: siguiente paso agendado'
     );
   }
 

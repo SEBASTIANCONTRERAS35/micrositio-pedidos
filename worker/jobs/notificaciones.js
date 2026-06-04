@@ -17,30 +17,64 @@ module.exports = async (job, logger) => {
   const subject = subjectFor(job.name, pedido);
   const html = htmlFor(job.name, pedido);
 
-  await sendEmail(pedido, subject, html, logger);
+  await sendEmail(pedido, subject, html, job.name, logger);
 
   return { ok: true };
 };
 
 // Envia el email del pedido via Resend si esta configurado.
-async function sendEmail(pedido, subject, html, logger) {
-  if (!resend || !pedido.cliente?.email) {
+async function sendEmail(pedido, subject, html, jobName, logger) {
+  // Demo-safe: si Resend NO esta configurado (o el pedido no trae email) se omite
+  // el envio y se continua OK; NO se lanza para no provocar reintentos/DLQ por un
+  // proveedor que no esta dado de alta.
+  if (!resend) {
     logger.warn(
-      { pedidoId: pedido.pedidoId },
-      'Email no enviado (Resend no configurado o sin email)'
+      {
+        event: 'notif.email.omitido',
+        pedidoId: pedido.pedidoId,
+        tipo: jobName,
+        motivo: 'no_config',
+      },
+      'Email omitido: Resend no esta configurado'
+    );
+    return;
+  }
+  if (!pedido.cliente?.email) {
+    logger.warn(
+      {
+        event: 'notif.email.omitido',
+        pedidoId: pedido.pedidoId,
+        tipo: jobName,
+        motivo: 'sin_email',
+      },
+      'Email omitido: el pedido no tiene email de cliente'
     );
     return;
   }
   try {
-    await resend.emails.send({
+    const respuesta = await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL || 'pedidos@zuyu.local',
       to: pedido.cliente.email,
       subject,
       html,
     });
-    logger.info({ pedidoId: pedido.pedidoId }, 'Email enviado');
+    logger.info(
+      {
+        event: 'notif.email.enviado',
+        pedidoId: pedido.pedidoId,
+        tipo: jobName,
+        messageId: respuesta?.data?.id,
+      },
+      'Email de notificacion enviado'
+    );
   } catch (e) {
-    logger.error({ err: e, pedidoId: pedido.pedidoId }, 'Error al enviar email');
+    // Fallo REAL de un Resend configurado: se loguea como error y se re-lanza para
+    // que el wrapper emita job.fallo/job.dlq y el job reintente (attempts acotado).
+    logger.error(
+      { event: 'notif.email.error', err: e, pedidoId: pedido.pedidoId, tipo: jobName },
+      'Error al enviar el email con Resend'
+    );
+    throw e;
   }
 }
 

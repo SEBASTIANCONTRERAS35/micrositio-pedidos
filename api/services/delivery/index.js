@@ -16,24 +16,46 @@ function getProvider(name) {
 
 // Selecciona el carrier optimo: override explicito del negocio o por ciudad
 function selectProviderByCity(negocio) {
+  const ciudad = (negocio?.direccion?.ciudad || '').toLowerCase();
+  let proveedor;
+  let motivo;
+
   // Override por campo: si el negocio fija un carrier (no "auto"), se respeta.
   if (negocio?.deliveryProvider && negocio.deliveryProvider !== 'auto') {
-    return negocio.deliveryProvider;
+    proveedor = negocio.deliveryProvider;
+    motivo = 'override';
+  } else if (ciudad.includes('cdmx') || ciudad.includes('mexico') || ciudad.includes('méxico')) {
+    proveedor = 'ivoy';
+    motivo = 'ciudad';
+  } else if (ciudad.includes('guadalajara') || ciudad.includes('monterrey')) {
+    proveedor = 'lalamove';
+    motivo = 'ciudad';
+  } else {
+    proveedor = 'uberDirect';
+    motivo = 'default';
   }
-  const ciudad = (negocio?.direccion?.ciudad || '').toLowerCase();
-  if (ciudad.includes('cdmx') || ciudad.includes('mexico') || ciudad.includes('méxico')) {
-    return 'ivoy';
-  }
-  if (ciudad.includes('guadalajara') || ciudad.includes('monterrey')) {
-    return 'lalamove';
-  }
-  return 'uberDirect';
+
+  logger.info(
+    {
+      event: 'delivery.proveedor.elegido',
+      negocioId: negocio?._id ? String(negocio._id) : undefined,
+      negocioSlug: negocio?.slug,
+      ciudad: ciudad || undefined,
+      proveedor,
+      motivo,
+    },
+    `Carrier de envio elegido: ${proveedor} (${motivo})`
+  );
+  return proveedor;
 }
 
 // Solicita un repartidor al carrier indicado
 async function requestDelivery(providerName, pedido) {
   const proveedor = getProvider(providerName);
-  logger.info({ pedidoId: pedido.pedidoId, providerName }, 'Solicitando repartidor');
+  logger.info(
+    { event: 'delivery.solicitado', pedidoId: pedido.pedidoId, provider: providerName },
+    'Solicitando repartidor al carrier'
+  );
   return proveedor.requestDelivery(pedido);
 }
 

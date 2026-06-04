@@ -26,18 +26,51 @@ module.exports = async (job, logger) => {
   const { provider, event } = job.data;
 
   if (!event || !event.deliveryId) {
-    logger.warn({ provider }, 'Webhook sin deliveryId — ignorado');
+    logger.warn(
+      { event: 'webhook.delivery.recibido', provider, motivo: 'sin_delivery_id' },
+      'Webhook de carrier sin deliveryId — ignorado'
+    );
     return { ok: false, reason: 'sin deliveryId' };
   }
 
   const pedido = await Pedido.findOne({ 'delivery.deliveryId': event.deliveryId });
   if (!pedido) {
-    logger.warn({ deliveryId: event.deliveryId }, 'Pedido no encontrado para webhook');
+    logger.warn(
+      {
+        event: 'webhook.delivery.recibido',
+        provider,
+        deliveryId: event.deliveryId,
+        motivo: 'pedido_no_encontrado',
+      },
+      'Webhook de carrier sin pedido asociado — ignorado'
+    );
     return { ok: false, reason: 'pedido no encontrado' };
   }
 
-  if (pedido.delivery?.estado === event.estado) {
-    logger.info({ pedidoId: pedido.pedidoId, estado: event.estado }, 'Webhook duplicado ignorado');
+  const estadoAnterior = pedido.delivery?.estado;
+
+  logger.info(
+    {
+      event: 'webhook.delivery.recibido',
+      provider,
+      pedidoId: pedido.pedidoId,
+      deliveryId: event.deliveryId,
+      estado: event.estado,
+    },
+    'Webhook de carrier recibido'
+  );
+
+  if (estadoAnterior === event.estado) {
+    logger.info(
+      {
+        event: 'webhook.delivery.recibido',
+        provider,
+        pedidoId: pedido.pedidoId,
+        estado: event.estado,
+        duplicado: true,
+      },
+      'Webhook de carrier duplicado — ignorado'
+    );
     return { ok: true, duplicate: true };
   }
 
@@ -49,6 +82,8 @@ module.exports = async (job, logger) => {
   pedido.markModified('delivery');
 
   const nuevoEstadoPedido = ESTADO_MAP[event.estado];
+  const estadoPedidoAnterior = pedido.estado;
+  let cambioEstadoPedido = false;
   if (nuevoEstadoPedido && pedido.estado !== nuevoEstadoPedido) {
     pedido.set('estado', nuevoEstadoPedido);
     pedido.historial = pedido.historial || [];
@@ -58,14 +93,42 @@ module.exports = async (job, logger) => {
       nota: `Webhook ${provider}: ${event.estado}`,
     });
     pedido.markModified('historial');
+    cambioEstadoPedido = true;
   }
 
   await pedido.save();
 
   if (event.estado === 'delivered') {
-    await colaNotificaciones.add('entregado', { pedidoId: pedido.pedidoId });
+    await colaNotificaciones.add('entregado', {
+      pedidoId: pedido.pedidoId,
+      requestId: job.data.requestId,
+    });
   }
 
-  logger.info({ pedidoId: pedido.pedidoId, estado: event.estado, provider }, 'Webhook procesado');
+  if (cambioEstadoPedido) {
+    logger.info(
+      {
+        event: 'webhook.delivery.recibido',
+        provider,
+        pedidoId: pedido.pedidoId,
+        deliveryEstadoAnterior: estadoAnterior,
+        deliveryEstadoNuevo: event.estado,
+        estadoAnterior: estadoPedidoAnterior,
+        estadoNuevo: nuevoEstadoPedido,
+      },
+      'Webhook de carrier procesado: cambio de estado del pedido'
+    );
+  } else {
+    logger.info(
+      {
+        event: 'webhook.delivery.recibido',
+        provider,
+        pedidoId: pedido.pedidoId,
+        deliveryEstadoAnterior: estadoAnterior,
+        deliveryEstadoNuevo: event.estado,
+      },
+      'Webhook de carrier procesado: estado de entrega actualizado'
+    );
+  }
   return { ok: true };
 };

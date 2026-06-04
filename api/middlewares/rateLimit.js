@@ -1,6 +1,7 @@
 const { RateLimiterRedis } = require('rate-limiter-flexible');
 const redis = require('../services/redis');
 const { RateLimitError } = require('../utils/errors');
+const baseLogger = require('../utils/logger');
 
 const limiterPublic = new RateLimiterRedis({
   storeClient: redis,
@@ -31,22 +32,37 @@ const limiterSensitive = new RateLimiterRedis({
   duration: 60,
 });
 
-// Crea un middleware de rate limit que consume puntos por IP
-function makeLimiter(limiter) {
+// Crea un middleware de rate limit que consume puntos por IP.
+// `nombre` identifica al limiter para distinguir abuso de auth vs webhook/etc.
+function makeLimiter(limiter, nombre) {
   return async (req, res, next) => {
     try {
       await limiter.consume(req.ip || 'unknown');
       next();
     } catch (rejRes) {
-      res.set('Retry-After', String(Math.round(rejRes.msBeforeNext / 1000) || 60));
+      const msBeforeNext = rejRes && rejRes.msBeforeNext;
+      res.set('Retry-After', String(Math.round(msBeforeNext / 1000) || 60));
+      // Seguridad: bloqueo por exceso de peticiones (posible fuerza bruta/abuso).
+      const log = req.log || baseLogger;
+      log.warn(
+        {
+          event: 'security.ratelimited',
+          limiter: nombre,
+          ip: req.ip,
+          method: req.method,
+          path: req.path,
+          msBeforeNext,
+        },
+        `Peticion bloqueada por rate limit (${nombre})`
+      );
       next(new RateLimitError());
     }
   };
 }
 
 module.exports = {
-  publicLimiter: makeLimiter(limiterPublic),
-  webhookLimiter: makeLimiter(limiterWebhook),
-  authLimiter: makeLimiter(limiterAuth),
-  sensitiveLimiter: makeLimiter(limiterSensitive),
+  publicLimiter: makeLimiter(limiterPublic, 'public'),
+  webhookLimiter: makeLimiter(limiterWebhook, 'webhook'),
+  authLimiter: makeLimiter(limiterAuth, 'auth'),
+  sensitiveLimiter: makeLimiter(limiterSensitive, 'sensitive'),
 };

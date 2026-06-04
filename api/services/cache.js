@@ -1,3 +1,5 @@
+const logger = require('../utils/logger');
+
 class TTLCache {
   // Inicializa el cache con un TTL por defecto en milisegundos
   constructor(defaultTTLMs = 30 * 60 * 1000) {
@@ -9,26 +11,32 @@ class TTLCache {
   get(key) {
     const entrada = this.cache.get(key);
     if (!entrada) {
+      logger.debug({ event: 'cache.miss', key }, 'Cache miss');
       return null;
     }
     if (Date.now() > entrada.expiresAt) {
       this.cache.delete(key);
+      logger.debug({ event: 'cache.miss', key, expirado: true }, 'Cache miss (entrada expirada)');
       return null;
     }
+    logger.debug({ event: 'cache.hit', key }, 'Cache hit');
     return entrada.value;
   }
 
   // Guarda un valor con su tiempo de expiracion calculado segun el TTL
   set(key, value, ttlMs = null) {
+    const ttl = ttlMs ?? this.defaultTTL;
     this.cache.set(key, {
       value,
-      expiresAt: Date.now() + (ttlMs ?? this.defaultTTL),
+      expiresAt: Date.now() + ttl,
     });
+    logger.debug({ event: 'cache.set', key, ttlMs: ttl }, 'Valor guardado en cache');
   }
 
   // Elimina una clave del cache
   delete(key) {
     this.cache.delete(key);
+    logger.debug({ event: 'cache.invalidate', key }, 'Entrada de cache invalidada');
   }
 
   // Vacia por completo el cache

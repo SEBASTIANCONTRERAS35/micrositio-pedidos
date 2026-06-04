@@ -36,19 +36,41 @@ async function resolverConfig(slug) {
 }
 
 // fetch con timeout + header de auth; lanza Error con .status si no es OK.
+// Punto central de salida a ZUYU: aqui se loguea TODO fallo (zuyu.api.error)
+// con status/code/timeout, sin exponer nunca el apiKey ni el cuerpo con PII.
 async function fetchZuyu(path, cfg, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const inicio = Date.now();
   try {
-    const res = await fetch(`${cfg.baseUrl}/api/public/v1${path}`, {
-      ...options,
-      headers: {
-        'X-API-Key': cfg.apiKey || '',
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      signal: controller.signal,
-    });
+    let res;
+    try {
+      res = await fetch(`${cfg.baseUrl}/api/public/v1${path}`, {
+        ...options,
+        headers: {
+          'X-API-Key': cfg.apiKey || '',
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+        signal: controller.signal,
+      });
+    } catch (err) {
+      // AbortError = timeout; cualquier otro = fallo de red.
+      const esTimeout = err.name === 'AbortError';
+      logger.error(
+        {
+          event: 'zuyu.api.error',
+          path,
+          method: options.method || 'GET',
+          code: esTimeout ? 'ZUYU_TIMEOUT' : 'ZUYU_NETWORK_ERROR',
+          timeout: esTimeout,
+          timeoutMs: esTimeout ? TIMEOUT_MS : undefined,
+          durationMs: Date.now() - inicio,
+        },
+        esTimeout ? 'Timeout llamando a la API de ZUYU' : 'Fallo de red llamando a la API de ZUYU'
+      );
+      throw err;
+    }
     if (!res.ok) {
       let body;
       try {
@@ -59,6 +81,18 @@ async function fetchZuyu(path, cfg, options = {}) {
       const err = new Error(body.message || `ZUYU API ${res.status}`);
       err.status = res.status;
       err.code = body.error || 'ZUYU_API_ERROR';
+      logger.error(
+        {
+          event: 'zuyu.api.error',
+          path,
+          method: options.method || 'GET',
+          status: res.status,
+          code: err.code,
+          timeout: false,
+          durationMs: Date.now() - inicio,
+        },
+        'La API de ZUYU respondio con error'
+      );
       throw err;
     }
     return res.json();
@@ -71,9 +105,17 @@ async function fetchZuyu(path, cfg, options = {}) {
 async function getCatalogo(slug) {
   const cfg = await resolverConfig(slug);
   if (!cfg.conectado) {
+    logger.debug(
+      { event: 'zuyu.mock', negocioSlug: slug, fuente: 'local' },
+      'Catalogo servido en modo mock (negocio no conectado a ZUYU)'
+    );
     return getCatalogoMock(slug);
   }
 
+  logger.debug(
+    { event: 'zuyu.conectado', negocioSlug: slug, baseUrl: cfg.baseUrl },
+    'Catalogo servido desde la API de ZUYU'
+  );
   const data = await fetchZuyu('/catalog', cfg);
   return toCatalogoVista(data, slug);
 }
@@ -117,15 +159,51 @@ async function cancelarPedido(slug, referenciaExterna, motivo) {
 async function ping(slug) {
   const cfg = await resolverConfig(slug);
   if (!cfg.conectado) {
+    logger.debug(
+      { event: 'zuyu.mock', negocioSlug: slug },
+      'Ping a ZUYU omitido (negocio en modo mock)'
+    );
     return { ok: true, mode: 'mock' };
   }
   try {
     const r = await fetchZuyu('/health', cfg);
-    return { ok: r.status === 'ok', ...r };
+    const ok = r.status === 'ok';
+    logger.info(
+      { event: ok ? 'zuyu.ping.ok' : 'zuyu.ping.fail', negocioSlug: slug, status: r.status },
+      ok ? 'ZUYU respondio al healthcheck' : 'ZUYU respondio degradado al healthcheck'
+    );
+    return { ok, ...r };
   } catch (e) {
-    logger.error({ err: e.message }, 'ZUYU ping failed');
+    // fetchZuyu ya emitio zuyu.api.error con el detalle; aqui solo el resultado.
+    logger.warn({ event: 'zuyu.ping.fail', negocioSlug: slug }, 'Healthcheck de ZUYU fallido');
     return { ok: false, error: e.message };
   }
+}
+
+// Auditoria de cambio de la integracion ZUYU de un negocio. Loguea SOLO flags
+// (que se roto/conecto), nunca apiKey/webhookSecret. Lo usa el panel del dueno.
+function logIntegracionActualizada({
+  negocioId,
+  negocioSlug,
+  usuarioId,
+  conectado,
+  baseUrl,
+  apiKeyRotada,
+  webhookSecretRotado,
+} = {}) {
+  logger.info(
+    {
+      event: 'integracion.actualizada',
+      negocioId: negocioId ? String(negocioId) : undefined,
+      negocioSlug,
+      usuarioId: usuarioId ? String(usuarioId) : undefined,
+      conectado,
+      baseUrl,
+      apiKeyRotada: !!apiKeyRotada,
+      webhookSecretRotado: !!webhookSecretRotado,
+    },
+    'Integracion ZUYU del negocio actualizada'
+  );
 }
 
 // True si el negocio esta conectado a ZUYU (no en modo mock).
@@ -155,4 +233,5 @@ module.exports = {
   cancelarPedido,
   ping,
   estaConectado,
+  logIntegracionActualizada,
 };

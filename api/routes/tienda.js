@@ -14,15 +14,27 @@ router.get('/:slug', async (req, res) => {
 
   const cacheado = tiendaCache.get(slug);
   if (cacheado) {
+    req.log.debug(
+      { event: 'tienda.catalogo.visto', negocioSlug: slug, cacheHit: true },
+      'Catalogo de la tienda visto (cache)'
+    );
     return res.render('tienda/index', cacheado);
   }
 
   const catalogo = await zuyu.getCatalogo(slug);
   if (!catalogo) {
+    req.log.warn(
+      { event: 'tienda.negocio.no_encontrado', negocioSlug: slug },
+      'Negocio no encontrado al ver el catalogo'
+    );
     return res.status(404).render('tienda/404', { mensaje: 'Negocio no encontrado' });
   }
 
   tiendaCache.set(slug, catalogo, 60 * 60 * 1000);
+  req.log.debug(
+    { event: 'tienda.catalogo.visto', negocioSlug: slug, cacheHit: false },
+    'Catalogo de la tienda visto'
+  );
   res.render('tienda/index', catalogo);
 });
 
@@ -31,6 +43,10 @@ router.get('/:slug/producto/:productoId', async (req, res) => {
   const { slug, productoId } = req.params;
   const negocio = await Negocio.findOne({ slug, activo: true }).lean();
   if (!negocio) {
+    req.log.warn(
+      { event: 'tienda.negocio.no_encontrado', negocioSlug: slug },
+      'Negocio no encontrado al ver un producto'
+    );
     return res.status(404).render('tienda/404', { mensaje: 'Negocio no encontrado' });
   }
   if (!mongoose.Types.ObjectId.isValid(productoId)) {
@@ -44,6 +60,15 @@ router.get('/:slug/producto/:productoId', async (req, res) => {
   if (!producto) {
     return res.status(404).render('tienda/404', { mensaje: 'Producto no encontrado' });
   }
+  req.log.debug(
+    {
+      event: 'tienda.producto.visto',
+      negocioSlug: slug,
+      negocioId: negocio._id.toString(),
+      productoId,
+    },
+    'Producto de la tienda visto'
+  );
   res.render('tienda/producto', {
     negocio: { ...negocio, slug },
     producto,
@@ -54,8 +79,20 @@ router.get('/:slug/producto/:productoId', async (req, res) => {
 router.get('/:slug/checkout', async (req, res) => {
   const negocio = await Negocio.findOne({ slug: req.params.slug, activo: true }).lean();
   if (!negocio) {
+    req.log.warn(
+      { event: 'tienda.negocio.no_encontrado', negocioSlug: req.params.slug },
+      'Negocio no encontrado al ver el checkout'
+    );
     return res.status(404).render('tienda/404', { mensaje: 'Negocio no encontrado' });
   }
+  req.log.info(
+    {
+      event: 'tienda.checkout.visto',
+      negocioSlug: req.params.slug,
+      negocioId: negocio._id.toString(),
+    },
+    'Checkout de la tienda visto'
+  );
   res.render('tienda/checkout', { negocio: { ...negocio, slug: req.params.slug } });
 });
 
@@ -63,6 +100,10 @@ router.get('/:slug/checkout', async (req, res) => {
 router.get('/:slug/pedido/:pedidoId', async (req, res) => {
   const negocio = await Negocio.findOne({ slug: req.params.slug, activo: true }).lean();
   if (!negocio) {
+    req.log.warn(
+      { event: 'tienda.negocio.no_encontrado', negocioSlug: req.params.slug },
+      'Negocio no encontrado al ver la confirmacion del pedido'
+    );
     return res.status(404).render('tienda/404', { mensaje: 'Negocio no encontrado' });
   }
 
@@ -72,8 +113,27 @@ router.get('/:slug/pedido/:pedidoId', async (req, res) => {
   }
 
   if (pedido.negocioId.toString() !== negocio._id.toString()) {
+    req.log.warn(
+      {
+        event: 'pedido.tracking.idor',
+        pedidoId: req.params.pedidoId,
+        negocioSlug: req.params.slug,
+        negocioId: negocio._id.toString(),
+      },
+      'Intento de ver confirmacion de pedido de otro negocio'
+    );
     return res.status(404).render('tienda/404', { mensaje: 'Pedido no encontrado' });
   }
+
+  req.log.debug(
+    {
+      event: 'tienda.confirmacion.vista',
+      negocioSlug: req.params.slug,
+      negocioId: negocio._id.toString(),
+      pedidoId: pedido.pedidoId,
+    },
+    'Confirmacion del pedido vista'
+  );
 
   res.render('tienda/pedido-confirmacion', {
     negocio: { ...negocio, slug: req.params.slug },
@@ -85,6 +145,10 @@ router.get('/:slug/pedido/:pedidoId', async (req, res) => {
 router.get('/:slug/mis-pedidos', async (req, res) => {
   const negocio = await Negocio.findOne({ slug: req.params.slug, activo: true }).lean();
   if (!negocio) {
+    req.log.warn(
+      { event: 'tienda.negocio.no_encontrado', negocioSlug: req.params.slug },
+      'Negocio no encontrado al ver mis pedidos'
+    );
     return res.status(404).render('tienda/404', { mensaje: 'Negocio no encontrado' });
   }
   res.render('tienda/mis-pedidos', { negocio: { ...negocio, slug: req.params.slug } });
