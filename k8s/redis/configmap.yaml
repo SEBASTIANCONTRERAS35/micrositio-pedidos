@@ -39,7 +39,9 @@ data:
 
     # Memory limits
     maxmemory 200mb
-    maxmemory-policy allkeys-lru
+    # noeviction: si Redis se llena, RECHAZA escrituras en vez de BORRAR claves.
+    # Crítico para un backend de cola: allkeys-lru podría descartar jobs encolados.
+    maxmemory-policy noeviction
 
     # Logging
     loglevel notice

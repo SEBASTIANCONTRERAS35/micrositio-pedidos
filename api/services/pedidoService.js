@@ -40,8 +40,18 @@ const redisConn = {
   port: parseInt(process.env.REDIS_PORT || '6379', 10),
   password: process.env.REDIS_PASSWORD,
 };
-const colaDelivery = new Queue('delivery', { connection: redisConn });
-const colaNotificaciones = new Queue('notificaciones', { connection: redisConn });
+// removeOnComplete/removeOnFail evitan que los jobs terminados se acumulen
+// indefinidamente en Redis. Sin esto, las claves 'bull:notificaciones:*' crecían
+// sin límite (se detectaron ~21k jobs completados sin limpiar).
+const defaultJobOptions = {
+  removeOnComplete: 1000, // conserva solo los últimos 1000 completados
+  removeOnFail: 5000, // conserva más fallidos para depurar
+};
+const colaDelivery = new Queue('delivery', { connection: redisConn, defaultJobOptions });
+const colaNotificaciones = new Queue('notificaciones', {
+  connection: redisConn,
+  defaultJobOptions,
+});
 
 /** Encola la notificacion de "pedido creado" al cliente. */
 function notificarCreado(pedidoId) {
